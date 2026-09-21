@@ -1,0 +1,14 @@
+<ComtecQueries>
+ <query kind="user" name="Custom/CMHS/Test_web/query1">
+    <text>--Custom/CMHS/Test_web/query1
+
+      --declare @id as nvarchar(120) ='12345' --%id%- uncomment for testing /comment
+      
+      select 'hello' + @id world
+
+    </text>    
+    <parameter defaultvalue="" name="id" type="string" />
+    <comment>this is query comment</comment>
+  </query>
+
+</ComtecQueries>

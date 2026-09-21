@@ -1,0 +1,75 @@
+(function(){
+ const E=CMHS_V2_ENGINE;let count=0;
+ function assert(ok,message){if(!ok)throw Error(message);count++;}
+ function rejects(fn){let failed=false;try{fn();}catch{failed=true;}assert(failed,'Expected rejection');}
+ assert(E.csv('\ufeffa,b\r\n"x,y","a""b"\r\n')[1][1]==='a"b','CSV quote escaping');
+ assert(E.csv('queryname,sql\nQ,"select 1,\n2"')[1][1]==='select 1,\n2','CSV multiline');
+ assert(E.queryRows('One\nTwo').length===2,'Headerless list');
+ assert(E.queryRows('queryname,parameters,network\nQ,id:string=42,Example')[0].network==='Example','Network filter');
+ rejects(()=>E.csv('"unfinished'));rejects(()=>E.queryRows('Q\nQ'));rejects(()=>E.queryRows('queryname,sql\nQ'));rejects(()=>E.queryRows('../Q'));rejects(()=>E.queryRows('Custom/CMHS/X/Q'));
+ const params=E.parameterSpecs('id:string=42;code:int=1',null);assert(params[1].type==='int'&&params[0].defaultvalue==='42','Parameter specs');rejects(()=>E.parameterSpecs('id;id',null));
+ const nodes=['a','b','c'].map((name,i)=>({getAttribute:k=>k==='name'?name:null,p:{x:i*7,y:i*11}}));const edges=[['a','b'],['b','a'],['b','c']].map(([a,b])=>({getAttribute:k=>k==='producer'?a:b}));const model={nodes,edges,node:name=>nodes.find(n=>n.getAttribute('name')===name),position:n=>({...n.p}),move(name,x,y){this.node(name).p={x,y};}};
+ E.layout(model);assert(nodes[2].p.x>nodes[0].p.x&&nodes[0].p.y!==nodes[1].p.y,'Layout handles cycles');E.align(model,['a','b','c'],'left');assert(nodes.every(n=>n.p.x===nodes[0].p.x),'Align');E.align(model,['a','b','c'],'space-y');assert(nodes.map(n=>n.p.y).sort((a,b)=>a-b)[1]===41,'Distribute');
+ const node=(name,role)=>({tagName:role,children:[],hasAttribute:()=>true,getAttribute:k=>({name,typename:'Example',module:'Example.cem',x:'0',y:'0'})[k]??null});
+ const source=node('source','producer'),processor=node('processor','processor'),other=node('other','processor'),output=node('output','consumer');
+ const edge=(from,to)=>({getAttribute:k=>k==='producer'?from:to,setAttribute(k,v){if(k==='producer')from=v;else to=v;}});
+ const links=[edge('source','processor'),edge('processor','output')];
+ const graph={nodes:[source,processor,other,output],edges:links,node(name){return this.nodes.find(n=>n.getAttribute('name')===name);},setup:{children:[source]}};
+ const connect=(from,to,existing)=>CMHS.NetworkDocument.prototype.connect.call(graph,from,to,existing);
+ rejects(()=>connect('processor','processor'));rejects(()=>connect('other','output'));rejects(()=>connect('source','output'));
+ checkRewire: {const existing=links[1];connect('other','output',existing);assert(existing.getAttribute('producer')==='other','Reconnect excludes its own old input');connect('processor','output',existing);}
+ const issues=()=>CMHS.NetworkDocument.prototype.issues.call(graph).filter(i=>i.level==='error');assert(issues().length===0,'Connected source and output valid');
+ graph.edges=[edge('source','processor')];assert(issues().some(i=>i.message.includes('output consumer')),'Unreachable output rejected');
+ graph.edges=[...links,edge('other','output'),edge('other','other')];assert(issues().some(i=>i.message.includes('more than one'))&&issues().some(i=>i.message.includes('Self-connection')),'Imported illegal links rejected');
+ graph.edges=links;graph.setup.children=[source,node('source2','producer')];assert(issues().some(i=>i.message.includes('exactly one')),'Multiple producers rejected');graph.setup.children=[];assert(issues().some(i=>i.message.includes('exactly one')),'Missing producer rejected');
+ const naming=(name,type='FileWriter',network='Destination',origin='Source')=>CMHS.additionName(name,type,network,origin);
+ assert(naming('XMLFileWriter1_Source_2')==='XMLFileWriter1_Destination_2','Copied filewriter uses destination network');
+ assert(naming('XMLFileWriter1_Source')==='XMLFileWriter1_Destination_1','Legacy network name receives a counter');
+ assert(naming('XMLFileWriter1_2')==='XMLFileWriter1_Destination_2','Counter is retained when network inserted');
+ assert(naming('XMLFileWriter1')==='XMLFileWriter1_Destination_1','New writer includes network and counter');
+ assert(naming('Process_Source_4','XSLProcessor')==='Process_Destination_4','Other copied element names rebase too');
+ assert(naming('DATA_1','XSLProcessor','B','A')==='DATA_1','Network replacement respects name boundaries');
+ assert(naming('XMLFileWriter1_Net_1_2','FileWriter','New_2','Net_1')==='XMLFileWriter1_New_2_2','Network names containing counters remain intact');
+ const unique=(base,used)=>CMHS.NetworkDocument.prototype.uniqueName.call({node:n=>used.includes(n)},base);
+ assert(unique('Writer_2',['Writer_2','Writer_3'])==='Writer_4','Rightmost counter increments across collisions');
+ assert(unique('Writer',['Writer','Writer_1'])==='Writer_2','Counter appended when absent');
+ assert(unique('Writer_009',['Writer_009'])==='Writer_010','Counter padding preserved');
+ assert(unique('Writer_2',[])==='Writer_2','Free names retained');
+ const laneNodes=[node('p','producer'),node('a','processor'),node('b','processor'),node('early','consumer'),node('late','consumer')];laneNodes.forEach((n,i)=>n.p={x:i*5,y:i*7});
+ const lanes={nodes:laneNodes,edges:[edge('p','a'),edge('p','early'),edge('a','b'),edge('b','late')],node(name){return this.nodes.find(n=>n.getAttribute('name')===name);},position:n=>({...n.p}),move(name,x,y){this.node(name).p={x,y};}};
+ E.layout(lanes);assert(Math.min(...laneNodes.filter(n=>n.tagName==='consumer').map(n=>n.p.y))>Math.max(...laneNodes.filter(n=>n.tagName!=='consumer').map(n=>n.p.y)),'All outputs arranged below processors, including early branches');
+ const targets=[{network:'A',decorator:'D1'},{network:'A',decorator:'D2'},{network:'B',decorator:'D1'}];
+ const mapped=E.queryRows('network,decorator,queryname\nA,D1,First\nA,D2,Second\nB,D1,First');
+ assert(E.validateQueryMappings(targets,mapped).length===3,'Queries map to exact network/decorator pairs');
+ rejects(()=>E.validateQueryMappings(targets,mapped.slice(0,2)));
+ rejects(()=>E.validateQueryMappings(targets,[...mapped,{network:'B',decorator:'Unknown',queryname:'Bad'}]));
+ rejects(()=>E.validateQueryMappings(targets,[...mapped,{network:'A',decorator:'D2',queryname:'First'}]));
+ rejects(()=>E.validateQueryMappings(targets,E.queryRows('First')));
+ const typed=(name,type)=>({getAttribute:k=>k==='name'?name:k==='typename'?type:null});
+ const queryGraph={nodes:[typed('x1','XSLProcessor'),typed('d1','XMLDecorator'),typed('x2','XSLProcessor'),typed('d2','XMLDecorator')],edges:[edge('x1','d1'),edge('d1','x2'),edge('x2','d2')],node(name){return this.nodes.find(n=>n.getAttribute('name')===name);}};
+ assert(E.downstreamDecorators(queryGraph,'x1').join()==='d1'&&E.downstreamDecorators(queryGraph,'x2').join()==='d2','XSL suggestions stop at their own decorator');
+ queryGraph.edges=[edge('x1','x2'),edge('x2','d2')];assert(E.downstreamDecorators(queryGraph,'x1').length===0,'Queries do not cross the next XSL processor');
+ const zipped=E.zip
+([{name:'folder/è.xml',text:'<x>hello & ciao</x>'},{name:'empty.txt',text:''}]);assert(new DataView(zipped.buffer).getUint32(0,true)===0x04034b50,'ZIP signature');rejects(()=>E.zip([{name:'../bad',text:''}]));rejects(()=>E.zip([{name:'same',text:''},{name:'same',text:''}]));
+ const declaration='<?xml version="1.0" encoding="UTF-8"?>',body='<root>città</root>';
+ const prologs=[body,declaration+'\n'+body,"<?xml version='1.0' encoding='utf-16'?>\r\n"+body,'\ufeff  '+declaration+'\n'+declaration+'\n'+body];
+ const xmlCases=prologs.map(input=>{const result=CMHS.withXMLDeclaration(input);assert(result===declaration+'\n'+body,'Exactly one UTF-8 declaration regardless of serializer output');assert(CMHS.withXMLDeclaration(result)===result,'XML declaration normalization is idempotent');return result;});
+ const pi='<?xml-stylesheet href="local.xsl" type="text/xsl"?>';assert(CMHS.withXMLDeclaration(pi+body).includes(pi),'Other processing instructions preserved');
+ assert(CMHS.withXMLDeclaration('<root><![CDATA['+declaration+']]></root>').includes('<![CDATA['+declaration+']]>'),'Embedded declaration text preserved');
+ window.XMLSerializer=class{serializeToString(doc){return doc;}};
+ assert(CMHS.serializeDocument(declaration+'\n'+body)===declaration+'\n'+body,'Document serializer adds no duplicate declaration');
+ const invitation='01234567-89ab-4cde-8f01-23456789abcd';
+ const encoded='MDEyMzQ1NjctODlhYi00Y2RlLThmMDEtMjM0NTY3ODlhYmNk';
+ const G=CMHS_INVITATION;
+ assert(G.matchesGuid(invitation,encoded),'Matching GUID accepted');
+ assert(G.matchesGuid('  '+invitation.toUpperCase()+'  ',encoded),'GUID case and surrounding whitespace normalized');
+ assert(G.matchesGuid('{'+invitation+'}',encoded),'Braced GUID accepted');
+ assert(!G.matchesGuid('11234567-89ab-4cde-8f01-23456789abcd',encoded),'Different GUID rejected');
+ assert(!G.matchesGuid(encoded,encoded),'Base64 value is not accepted as the invitation');
+ assert(!G.matchesGuid('',encoded)&&!G.matchesGuid('not-a-guid',encoded),'Empty and malformed input rejected');
+ assert(!G.matchesGuid('{'+invitation,encoded),'Unbalanced braces rejected');
+ assert(!G.matchesGuid(invitation,'!invalid!')&&!G.matchesGuid(invitation,''),'Invalid or absent configured Base64 rejected');
+ assert(!G.matchesGuid(invitation,null)&&!G.matchesGuid(invitation,42),'Invalid config types rejected');
+ assert(!G.matchesGuid(invitation,'aGVsbG8='),'Base64 must decode to a GUID');
+ return JSON.stringify({checks:count,zip:Array.from(zipped),xmlCases});
+})()

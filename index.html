@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+ <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+ <title>CMHS Studio v2 · Network editor</title>
+ <link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css">
+</head>
+<body>
+ <section id="beta-screen" class="beta-screen" hidden aria-labelledby="beta-title">
+  <form id="beta-form" class="beta-card">
+   <span class="beta-mark" aria-hidden="true">◇</span><p class="eyebrow">CMHS STUDIO · BETA</p>
+   <h1 id="beta-title">Welcome betatesters</h1>
+   <p>Build, connect and explore your networks. Enter your name and invitation code to begin.</p>
+   <label for="beta-name">Consultant name</label><input id="beta-name" name="name" autocomplete="name" maxlength="100" required>
+   <label for="beta-code">Invitation GUID</label><input id="beta-code" name="invitation" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required>
+   <p id="beta-error" class="beta-error" role="alert"></p><button class="primary" type="submit">Enter workspace →</button>
+   <small>Your name stays in this browser. Files are processed locally; no files are uploaded to a server.</small>
+  </form>
+ </section>
+ <header class="app-header">
+
+  <a class="brand" href="./index.html" aria-label="CMHS Studio home"><span class="brand-icon">◇</span><span>CMHS <strong>Studio</strong><sup class="version-badge">v2</sup><small>NETWORK WORKSPACE</small></span></a>
+  <div class="header-divider"></div><span class="local-badge"><i></i>Local workspace</span>
+  <div class="header-actions"><button id="help-btn" class="quiet">Guide <kbd>?</kbd></button><button id="import-btn">↑ Import XML</button><button id="export-btn" class="primary">↓ Save / Export</button></div>
+ </header>
+ <main class="workspace">
+  <aside class="sidebar">
+   <div class="side-tabs" role="tablist"><button id="networks-tab" class="active" role="tab" aria-selected="true">Networks <span id="network-total"></span></button><button id="library-tab" role="tab" aria-selected="false">Library <span id="type-total"></span></button></div>
+   <div class="side-search"><input id="catalog-search" type="search" placeholder="Search networks…" aria-label="Search networks or element library"><span>⌕</span></div>
+   <div id="library-filter" class="role-filters" hidden><button data-role="all" class="active">All</button><button data-role="producer">Sources</button><button data-role="processor">Processors</button><button data-role="consumer">Outputs</button></div>
+   <div id="catalog-list" class="catalog-list"></div>
+   <div class="sidebar-footer"><button id="new-btn">＋ New network</button><button id="hub-btn" class="quiet">Hub configuration ↗</button><a href="data/elements.sqlite" download="cmhs-elements.sqlite">Download element database ↓</a></div>
+  </aside>
+  <section class="editor">
+   <div class="network-heading"><div><div class="eyebrow" id="network-family">NETWORK</div><h1 id="network-title">Loading workspace…</h1><p id="network-description"></p></div><button id="network-settings-btn" title="Edit network settings">⚙ Settings</button></div>
+   <div class="canvas-toolbar"><div class="tool-group"><button id="select-tool" class="icon-tool active" title="Select and move elements (V)">↖ <span>Select</span></button><button id="connect-tool" class="icon-tool" title="Connect elements (C)">⌁ <span>Connect</span></button></div><div class="toolbar-separator"></div><button id="undo-btn" title="Undo (Ctrl/Cmd+Z)" aria-label="Undo">↶</button><button id="redo-btn" title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo">↷</button><div class="toolbar-spacer"></div><button id="issues-btn" class="check-button">✓ Check network</button><button id="fit-btn" title="Fit all elements (F)">⛶ Fit</button></div>
+   <div id="canvas" class="canvas" tabindex="0" aria-label="Network canvas. Drag elements to move. Click an output port then an input port to connect.">
+    <svg id="graph" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Editable network graph"><defs><pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#d3dce7"/></pattern><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#8c9bab"/></marker><marker id="arrow-selected" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#087f8c"/></marker></defs><rect width="100%" height="100%" fill="url(#dots)"/><g id="viewport"><g id="edges"></g><g id="nodes"></g><path id="pending-edge" class="pending-edge" marker-end="url(#arrow-selected)" hidden/></g></svg>
+    <div class="canvas-hint" id="canvas-hint">Drag elements · Drag background to pan · Scroll to zoom</div>
+    <div class="zoom-control"><button id="zoom-out" aria-label="Zoom out">−</button><button id="zoom-value" title="Reset zoom to 100%">100%</button><button id="zoom-in" aria-label="Zoom in">＋</button></div>
+    <div id="empty-canvas" class="empty-canvas" hidden><span>◇</span><h2>Start with a source</h2><p>Choose an element in the library to build your network.</p><button id="empty-library-btn" class="primary">Browse element library →</button></div>
+   </div>
+   <p class="local-privacy">Files are processed locally in your browser. Drafts use local browser storage. No files are uploaded to a server.</p>
+   <footer class="statusbar"><span id="graph-stats"></span><span id="save-status" role="status">Original file</span></footer>
+  </section>
+  <aside id="inspector" class="inspector" aria-label="Properties panel"></aside>
+ </main>
+ <div id="toast" class="toast" role="status" hidden></div>
+ <input type="file" id="file-input" accept=".mhn,.mhc,.xml" multiple hidden>
+ <dialog id="modal"><form method="dialog" class="dialog-shell"><header><div><span class="eyebrow" id="modal-eyebrow">WORKSPACE</span><h2 id="modal-title"></h2></div><button value="cancel" class="dialog-close" aria-label="Close">×</button></header><div id="modal-body"></div><footer id="modal-footer"></footer></form></dialog>
+ <script src="aa49e6b992f6ff07a7a753f4688f19a5.js"></script><script src="data/catalog.js"></script><script src="data/templates.js"></script><script src="model.js"></script><script src="v2-engine.js"></script><script src="app.js"></script><script src="v2-ui.js"></script><script src="4bc9e8e5425eca17b441537bf664e289.js"></script>
+</body>
+</html>

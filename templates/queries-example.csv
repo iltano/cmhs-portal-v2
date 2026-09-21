@@ -1,0 +1,4 @@
+network,decorator,queryname,parameters,sql,comment
+ExampleNetwork,XMLDecorator1,GetExample,id:string=,"select 'hello' + @id as world",Example query
+ExampleNetwork,XMLDecorator2,GetDetails,id:string=,"select @id as id",Replace example SQL with the intended query
+OtherNetwork,XMLDecorator1,GetOtherExample,id:string=,"select @id as id",Change network and decorator names to match your network

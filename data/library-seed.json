@@ -1,0 +1,137 @@
+{
+  "formatVersion": 1,
+  "elements": [
+    {
+      "role": "consumer",
+      "typename": "CCDSConsumer",
+      "module": "CMHSCCDSPlugin.cem",
+      "xml": "<consumer module='CMHSCCDSPlugin.cem' name='CCDSConsumer_Example_1' typename='CCDSConsumer' x='0' y='0'><comment>Generic CCDSConsumer example</comment><settings><parameters/></settings></consumer>"
+    },
+    {
+      "role": "consumer",
+      "typename": "CMHSDBLogWriterConsumer",
+      "module": "CMHSDBLogWriterConsumer.cem",
+      "xml": "<consumer module='CMHSDBLogWriterConsumer.cem' name='CMHSDBLogWriterConsumer_Example_1' typename='CMHSDBLogWriterConsumer' x='0' y='0'><comment>Generic CMHSDBLogWriterConsumer example</comment><settings><parameters><parameter name='Environment' value='%ENVIRONMENT%'/><parameter name='Identifier' value='ExampleLog'/><parameter name='MessageFormat' value='xml'/><parameter name='EnableLogging' value='true'/></parameters></settings></consumer>"
+    },
+    {
+      "role": "consumer",
+      "typename": "FileWriter",
+      "module": "builtin",
+      "xml": "<consumer module='builtin' name='FileWriter_Example_1' typename='FileWriter' x='0' y='0'><comment>Generic FileWriter example</comment><settings><parameters><parameter name='prefix' value='%INTERFACEDIR%\\%NETWORKNAME%\\Log\\Example_'/><parameter name='postfix' value='.xml'/><parameter name='UseGUID' value='false'/><parameter name='UseUniqueId' value='true'/><parameter name='UniqueIDFormat' value='%.3d'/><parameter name='UseDateTimeStamp' value='true'/><parameter name='MaxFileNameOffSet' value='999'/><parameter name='UseOnlyOffSet' value='false'/><parameter name='Encoding' value='UTF-8'/><parameter name='RetryCount' value='0'/><parameter name='WriteWithTempPostfixThenRename' value='false'/><parameter name='TempPostfix' value='.tmp'/><parameter name='DisableFileWriter' value='false'/></parameters></settings></consumer>"
+    },
+    {
+      "role": "consumer",
+      "typename": "MSMQWriter",
+      "module": "builtin",
+      "xml": "<consumer module='builtin' name='MSMQWriter_Example_1' typename='MSMQWriter' x='0' y='0'><comment>Generic MSMQWriter example</comment><settings><parameters><parameter name='queuename' value='.\\private$\\example_%NETWORKNAME%'/><parameter name='UseMetaDataAsQueueName' value='false'/><parameter name='MetaDataKey' value='Label'/><parameter name='UseTransactionForRemoteQueue' value='false'/><parameter name='RetryCount' value='0'/></parameters></settings></consumer>"
+    },
+    {
+      "role": "consumer",
+      "typename": "NullConsumer",
+      "module": "CMHSNullConsumer.cem",
+      "xml": "<consumer module='CMHSNullConsumer.cem' name='NullConsumer_Example_1' typename='NullConsumer' x='0' y='0'><comment>Generic NullConsumer example</comment><settings><parameters/></settings></consumer>"
+    },
+    {
+      "role": "processor",
+      "typename": "CCDSProcessor",
+      "module": "CMHSCCDSPlugin.cem",
+      "xml": "<processor module='CMHSCCDSPlugin.cem' name='CCDSProcessor_Example_1' typename='CCDSProcessor' x='0' y='0'><comment>Generic CCDSProcessor example</comment><settings><parameters><parameter name='Environment' value='%ENVIRONMENT%'/><parameter name='HandlerName' value='/cmhs/CExample'/><parameter name='PrettyPrintResponse' value='false'/><parameter name='ComtecCredentials' value=''/><parameter name='TimeOut' value='30'/><parameter name='IncludeInputInResponse' value='false'/></parameters></settings></processor>"
+    },
+    {
+      "role": "processor",
+      "typename": "CDMSExportProcessor",
+      "module": "CMHSCDMSExport.cem",
+      "xml": "<processor module='CMHSCDMSExport.cem' name='CDMSExportProcessor_Example_1' typename='CDMSExportProcessor' x='0' y='0'><comment>Generic CDMSExportProcessor example</comment><settings><parameters><parameter name='environment' value='%ENVIRONMENT%'/><parameter name='maxretry' value='0'/></parameters></settings></processor>"
+    },
+    {
+      "role": "processor",
+      "typename": "CMCSProcessor",
+      "module": "CMHSCMCSProcessor.cem",
+      "xml": "<processor module='CMHSCMCSProcessor.cem' name='CMCSProcessor_Example_1' typename='CMCSProcessor' x='0' y='0'><comment>Generic CMCSProcessor example</comment><settings><parameters><parameter name='environment' value='%ENVIRONMENT%'/><parameter name='RetryCount' value='0'/></parameters></settings></processor>"
+    },
+    {
+      "role": "processor",
+      "typename": "CMHSAdvFilter",
+      "module": "CMHSAdvFilter.cem",
+      "xml": "<processor module='CMHSAdvFilter.cem' name='CMHSAdvFilter_Example_1' typename='CMHSAdvFilter' x='0' y='0'><comment>Generic CMHSAdvFilter example</comment><settings><parameters><parameter name='FilterOn' value='Body'/><parameter name='Inverted' value='false'/><parameter name='MetadataName' value='Example'/><parameter name='ValueMustMatch' value='false'/><parameter name='Value' value='&lt;example&gt;'/></parameters></settings></processor>"
+    },
+    {
+      "role": "processor",
+      "typename": "CMHSXMLSlicerProcessor",
+      "module": "XMLSlicerProcessor.cem",
+      "xml": "<processor module='XMLSlicerProcessor.cem' name='CMHSXMLSlicerProcessor_Example_1' typename='CMHSXMLSlicerProcessor' x='0' y='0'><comment>Generic CMHSXMLSlicerProcessor example</comment><settings><parameters><parameter name='Header' value=''/><parameter name='ParentListElement' value='example'/></parameters></settings></processor>"
+    },
+    {
+      "role": "processor",
+      "typename": "CSV2XMLProcessor",
+      "module": "CSV2XMLProcessor.cem",
+      "xml": "<processor module='CSV2XMLProcessor.cem' name='CSV2XMLProcessor_Example_1' typename='CSV2XMLProcessor' x='0' y='0'><comment>Generic CSV2XMLProcessor example</comment><settings><parameters><parameter name='Separator' value=';'/><parameter name='SingleOutput' value='true'/><parameter name='ColumnHeaders' value='id,value'/></parameters></settings></processor>"
+    },
+    {
+      "role": "processor",
+      "typename": "MessageInMetadataGeneratorProcessor",
+      "module": "CMHSMessageInMetadata.cem",
+      "xml": "<processor module='CMHSMessageInMetadata.cem' name='MessageInMetadataGeneratorProcessor_Example_1' typename='MessageInMetadataGeneratorProcessor' x='0' y='0'><comment>Generic MessageInMetadataGeneratorProcessor example</comment><settings><parameters><parameter name='MetaDataName' value='Example'/></parameters></settings></processor>"
+    },
+    {
+      "role": "processor",
+      "typename": "MessageInMetadataRetrieverProcessor",
+      "module": "CMHSMessageInMetadata.cem",
+      "xml": "<processor module='CMHSMessageInMetadata.cem' name='MessageInMetadataRetrieverProcessor_Example_1' typename='MessageInMetadataRetrieverProcessor' x='0' y='0'><comment>Generic MessageInMetadataRetrieverProcessor example</comment><settings><parameters><parameter name='MetaDataNames' value='Example'/></parameters></settings></processor>"
+    },
+    {
+      "role": "processor",
+      "typename": "MetaDataGeneratorProcessor",
+      "module": "CMHSMetaData.cem",
+      "xml": "<processor module='CMHSMetaData.cem' name='MetaDataGeneratorProcessor_Example_1' typename='MetaDataGeneratorProcessor' x='0' y='0'><comment>Generic MetaDataGeneratorProcessor example</comment><settings><parameters><parameter name='MetaDataName' value='Example'/><parameter name='TagQueryForMetaData' value='//example/@id'/><parameter name='MetaValuePreFix' value=''/><parameter name='MetaValuePostFix' value=''/><parameter name='Attributes' value=''/></parameters></settings></processor>"
+    },
+    {
+      "role": "processor",
+      "typename": "MetaDataSubstituteProcessor",
+      "module": "CMHSMetaData.cem",
+      "xml": "<processor module='CMHSMetaData.cem' name='MetaDataSubstituteProcessor_Example_1' typename='MetaDataSubstituteProcessor' x='0' y='0'><comment>Generic MetaDataSubstituteProcessor example</comment><settings><parameters/></settings></processor>"
+    },
+    {
+      "role": "processor",
+      "typename": "XMLDecoratorByCQMSProcessor",
+      "module": "CMHSXMLDecoratorByCQMS.cem",
+      "xml": "<processor module='CMHSXMLDecoratorByCQMS.cem' name='XMLDecoratorByCQMSProcessor_Example_1' typename='XMLDecoratorByCQMSProcessor' x='0' y='0'><comment>Generic XMLDecoratorByCQMSProcessor example</comment><settings><parameters><parameter name='Environment' value='%ENVIRONMENT%'/><parameter name='InputPosition' value='decorator'/></parameters></settings></processor>"
+    },
+    {
+      "role": "processor",
+      "typename": "XSLProcessor",
+      "module": "XSLProcessor.cem",
+      "xml": "<processor module='XSLProcessor.cem' name='XSLProcessor_Example_1' typename='XSLProcessor' x='0' y='0'><comment>Generic XSLProcessor example</comment><settings><parameters><parameter name='filename' value='%XSLDIR%\\%NETWORKNAME%\\Example.xsl'/></parameters></settings></processor>"
+    },
+    {
+      "role": "producer",
+      "typename": "CCDSProducer",
+      "module": "CMHSCCDSPlugin.cem",
+      "xml": "<producer module='CMHSCCDSPlugin.cem' name='CCDSProducer_Example_1' pollInterval='10' polling='true' typename='CCDSProducer' x='0' y='0'><comment>Generic CCDSProducer example</comment><settings><parameters><parameter name='EnvironmentName' value='%ENVIRONMENT%'/><parameter name='CommandHandlerName' value='/cmhs/C%NETWORKNAME%'/><parameter name='CommandHandlerDescription' value='Example command handler'/><parameter name='CommandHandlerRequestSchema' value=''/><parameter name='CommandHandlerResponceSchema' value=''/></parameters></settings></producer>"
+    },
+    {
+      "role": "producer",
+      "typename": "FileReader",
+      "module": "builtin",
+      "xml": "<producer module='builtin' name='FileReader_Example_1' pollInterval='10' polling='true' typename='FileReader' x='0' y='0'><comment>Generic FileReader example</comment><settings><parameters><parameter name='directory' value='%INTERFACEDIR%\\%NETWORKNAME%\\In'/><parameter name='pattern' value='*.xml'/><parameter name='SortBy' value='Name'/><parameter name='Ascending' value='true'/></parameters></settings></producer>"
+    },
+    {
+      "role": "producer",
+      "typename": "MSMQReaderPolling",
+      "module": "builtin",
+      "xml": "<producer module='builtin' name='MSMQReaderPolling_Example_1' pollInterval='10' polling='true' typename='MSMQReaderPolling' x='0' y='0'><comment>Generic MSMQReaderPolling example</comment><settings><parameters><parameter name='queuename' value='.\\private$\\example_%NETWORKNAME%'/><parameter name='CreateQueue' value='false'/><parameter name='UseTransactionForRemoteQueue' value='false'/></parameters></settings></producer>"
+    },
+    {
+      "role": "producer",
+      "typename": "TextFileReader",
+      "module": "builtin",
+      "xml": "<producer module='builtin' name='TextFileReader_Example_1' pollInterval='10' polling='true' typename='TextFileReader' x='0' y='0'><comment>Generic TextFileReader example</comment><settings><parameters><parameter name='TextEncoding' value='UTF-8'/><parameter name='directory' value='%INTERFACEDIR%\\%NETWORKNAME%\\In'/><parameter name='pattern' value='*.xml'/><parameter name='SortBy' value='Name'/><parameter name='Ascending' value='true'/></parameters></settings></producer>"
+    },
+    {
+      "role": "producer",
+      "typename": "XMLFileReader",
+      "module": "builtin",
+      "xml": "<producer module='builtin' name='XMLFileReader_Example_1' pollInterval='10' polling='true' typename='XMLFileReader' x='0' y='0'><comment>Generic XMLFileReader example</comment><settings><parameters><parameter name='directory' value='%INTERFACEDIR%\\%NETWORKNAME%\\In'/><parameter name='pattern' value='*.xml'/><parameter name='SortBy' value='Name'/><parameter name='Ascending' value='true'/></parameters></settings></producer>"
+    }
+  ]
+}
