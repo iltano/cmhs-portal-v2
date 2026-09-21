@@ -30,7 +30,7 @@
   const body=el('div'),processors=[],decorators=[],models=new Map();
   docs.forEach(d=>{const m=new NetworkDocument(d.xml,d.filename);models.set(d.id,m);m.nodes.forEach(n=>{const item={id:d.id,name:n.getAttribute('name'),network:m.name};if(n.getAttribute('typename')==='XSLProcessor')processors.push(item);if(/XMLDecorator/i.test(n.getAttribute('typename')))decorators.push(item);});});
   note(body,`Export ${docs.length} network${docs.length===1?'':'s'}. Generated files are downloaded together in a ZIP; source files on disk are not overwritten.`);
-  let createXSL=null,createCQMS=null;const chosen=[],queryFields=[];
+  let createXSL=null,createCQMS=null,createCPMS=null;const chosen=[],queryFields=[];
   if(processors.length){
    createXSL=check(body,'Create starter XSL files and update selected processor filenames');
    note(body,'Uses templates/xsl_template.xsl. Review the starter logic before deployment. Existing XSL logic is not copied.');
@@ -47,13 +47,15 @@
    body.append(area);createCQMS.onchange=()=>{area.hidden=!createCQMS.checked;chosen.forEach(p=>p.queryArea.hidden=!createCQMS.checked);};
    note(area,'Query paths: Custom/CMHS/<network>/<queryname>. Each selected XSL uses only the queries from its chosen decorator. Existing XSL files remain unchanged.');
   }
+  createCPMS=check(body,'Create one consolidated CPMS process configuration');
+  note(body,'Adds one processConfig entry for every exported network to CPMS/cmhs-process-config.xml. The CPMS server placeholder remains unchanged.');
   const preview=el('pre','v2-preview');body.append(preview);
   const build=()=>{
    const xslNodes=Object.create(null),xslDecorators=Object.create(null),queryMappings=[];
    if(createXSL?.checked)chosen.filter(p=>p.input.checked).forEach(p=>{(xslNodes[p.id]??=[]).push(p.name);(xslDecorators[p.id]??=Object.create(null))[p.name]=p.querySource.value;});
    if(createXSL?.checked&&!Object.keys(xslNodes).length)throw Error('Select at least one XSL processor.');
    if(createCQMS?.checked)queryFields.forEach(d=>{if(!d.input.value.trim())throw Error(`Define queries for ${d.network} / ${d.name}.`);E.queryRows(d.input.value).forEach(row=>{if((row.network&&row.network!==d.network)||(row.decorator&&row.decorator!==d.name))throw Error(`Query mapping does not match ${d.network} / ${d.name}.`);queryMappings.push({...row,network:d.network,decorator:d.name});});});
-   const result=E.bundle(docs,{xslNodes,xslDecorators,cqms:!!createCQMS?.checked,queryMappings,templates:CMHS_TEMPLATES});
+   const result=E.bundle(docs,{xslNodes,xslDecorators,cqms:!!createCQMS?.checked,cpms:!!createCPMS.checked,queryMappings,templates:CMHS_TEMPLATES});
    result.mappingPreview=queryMappings.map(q=>`${q.network} / ${q.decorator} → Custom/CMHS/${q.network}/${q.queryname}`).join('\n');return result;
   };
   A.modal('Save network & optional files',body,[{text:'Preview files',run:()=>{const result=build();preview.textContent=result.files.map(f=>f.name).join('\n')+(result.mappingPreview?'\n\nQuery mappings\n'+result.mappingPreview:'');}},{text:'Download',run:()=>{const result=build();if(result.files.length===1)download(result.files[0].name.split('/').pop(),result.files[0].text,'application/xml');else download(docs.length===1?E.safeName(new NetworkDocument(docs[0].xml).name)+'_bundle.zip':'cmhs_networks.zip',E.zip(result.files),'application/zip');const updates=result.updates.filter(u=>new NetworkDocument(docs.find(d=>d.id===u.id).xml).toXML()!==u.xml);if(updates.length)A.commitNetworks(updates);close();A.toast(`Downloaded ${result.files.length} files.`);}}]);

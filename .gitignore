@@ -2,6 +2,8 @@
 *.log
 /tests/workspace-results.json
 /publication/
+DEPLOYMENT.md
 *_old.js
 *.rb
 /examples/
+/data/library-seed.json

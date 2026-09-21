@@ -17,7 +17,7 @@ CMHS Portal v2 provides a visual way to inspect, understand, modify, and export 
 * Validate network structure before export.
 * Export modified `.mhn` network files.
 * Preserve unknown XML settings and metadata when editing existing networks.
-* Generate supporting XSL and CQMS configuration where applicable.
+* Generate supporting XSL, CQMS query, and consolidated CPMS process configuration files where applicable.
 * Work with query mappings associated with individual networks and XML decorators.
 * Undo and redo network changes during the editing session.
 
@@ -44,7 +44,7 @@ The exported file is a new copy; the original file on your computer is not modif
 
 ## Example networks
 
-The repository contains anonymized example configurations intended to demonstrate common MessageHub network structures and component types.
+The application includes anonymized example configurations intended to demonstrate common MessageHub network structures and component types. They are bundled into the offline catalog, so the published site does not need the raw example source folder.
 
 These examples are provided as starting points for exploration and configuration. Names, comments, paths, credentials, and other deployment-specific information have been replaced with neutral example values.
 
@@ -77,13 +77,15 @@ When elements are copied between networks, CMHS Portal adjusts generated names w
 
 Connections and references are updated as part of the editing workflow.
 
-## XSL and query configuration
+## XSL, query, and process configuration
 
 CMHS Portal includes helpers for workflows involving XSL transformations and  queries.
 
 Generated XML files are normalized so that they contain exactly one UTF-8 XML declaration.
 
 Query configuration can be associated with specific network and XMLDecorator combinations rather than being applied globally to every generated stylesheet.
+
+During export, you can also create one CPMS file containing a `processConfig` entry for every network in the export. The supplied CPMS server placeholder is retained so it can be set for the destination environment.
 
 ## Import and export
 

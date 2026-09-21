@@ -280,7 +280,17 @@
 
  }
 
- function bundle(documents,{xslNodes={},xslDecorators={},cqms=false,csvText='',queryMappings=null,templates}={}){
+ function generateCPMS(networks,templateXML){
+
+  const doc=parseXML(templateXML);assert(doc.documentElement.tagName==='configuration','CPMS template must have a configuration root.');const configs=child(doc.documentElement,'processConfigs');assert(configs,'CPMS template has no processConfigs section.');const template=child(configs,'processConfig');assert(template,'CPMS template has no processConfig entry.');const names=new Set();
+
+  configs.replaceChildren();networks.forEach(network=>{assert(!names.has(network),`Duplicate network name in CPMS export: ${network}.`);names.add(network);const process=template.cloneNode(true),parameters=child(process,'parameters'),configuration=parameters&&child(parameters,'cmhs-configuration'),included=configuration&&child(configuration,'include-network');assert(included,`CPMS template processConfig must contain parameters/cmhs-configuration/include-network.`);process.setAttribute('code',`cmhs_${network}`);process.setAttribute('name',`CMHS - ${network}`);included.textContent=network;configs.append(process);});
+
+  return serializeDocument(doc);
+
+ }
+
+ function bundle(documents,{xslNodes={},xslDecorators={},cqms=false,cpms=false,csvText='',queryMappings=null,templates}={}){
 
   const rows=cqms?(queryMappings||queryRows(csvText)):[],files=[],updates=[],seen=new Set();
 
@@ -308,7 +318,7 @@
 
    }add(`networks/${filename}.mhn`,m.toXML());updates.push({id:item.id,xml:m.toXML()});
 
-  }return{files,updates};
+  }if(cpms){assert(templates?.cpms,'CPMS template is unavailable.');add('CPMS/cmhs-process-config.xml',generateCPMS(parsed.map(({model:m})=>m.name),templates.cpms));}return{files,updates};
 
  }
 
@@ -332,6 +342,6 @@
 
  }
 
- global.CMHS_V2_ENGINE={csv,queryRows,validateQueryMappings,downstreamDecorators,parameterSpecs,fragment,paste,layout,align,addLogs,addDBLogs,replace,generateCQMS,generateXSL,bundle,zip,safeName};
+ global.CMHS_V2_ENGINE={csv,queryRows,validateQueryMappings,downstreamDecorators,parameterSpecs,fragment,paste,layout,align,addLogs,addDBLogs,replace,generateCQMS,generateXSL,generateCPMS,bundle,zip,safeName};
 
 })(window);
