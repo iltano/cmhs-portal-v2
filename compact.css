@@ -1,3 +1,4 @@
+.network-item strong{overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
 @media(max-height:900px) and (min-width:801px){
   :root{font-size:12px}
   .app-header{height:58px;padding:0 16px;gap:16px}
