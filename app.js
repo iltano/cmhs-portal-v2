@@ -69,7 +69,7 @@
     const name=options.hubManaged?requested:uniqueNetworkName(requested),renamed=name!==document.name;if(renamed)document.renameNetwork(name);
     document.filename=renamed?`${name}.mhn`:filename;
     const id=options.id||`import:${Date.now()}:${filename}:${networks.length}`,network={id,filename:document.filename,name:document.name,xml:document.toXML(),description:document.description,nodeCount:document.nodes.length,connectionCount:document.edges.length,imported:true,hubManaged:!!options.hubManaged,hubKey:options.hubKey||null};
-    networks.push(network);if(!network.hubManaged)drafts.set(id,{...network});return network;
+    networks.push(network);if(!network.hubManaged||options.asDraft)drafts.set(id,{...network});return network;
   }
   function openNetwork(id){
     const network=networks.find(n=>n.id===id);if(!network)return;
@@ -98,14 +98,13 @@
     const list=$('catalog-list');list.replaceChildren();const q=$('catalog-search').value.toLowerCase().trim();
     if(tab==='networks'){
       const filtered=networks.filter(n=>(n.name+' '+n.description).toLowerCase().includes(q));
-      const addItem=(n,configuration=false)=>{const b=button('',()=>openNetwork(n.id),'network-item'+(n.id===activeId?' active':'')+(configuration?' configuration-network':''));b.title=n.name+'\n'+n.description;b.oncontextmenu=event=>{event.preventDefault();networkContextMenu(event,n.id);};const row=el('div','item-row');row.append(el('span','network-icon','⌘'),el('strong','',n.name));if(configuration)row.append(el('span','configuration-badge','CONFIG'));if(drafts.has(n.id))row.append(el('span','draft-dot'));b.append(row,el('small','',configuration?`${hubFilename} · ${n.nodeCount} elements`:`${n.name.match(/^\d+/)?.[0]||'CMHS'} · ${n.nodeCount} elements`));list.append(b);};
+      const acceptLibraryNetwork=(target,targetId=null)=>{target.ondragover=event=>{if(Array.from(event.dataTransfer.types).includes('application/x-cmhs-network')||Array.from(event.dataTransfer.types).includes('application/x-cmhs-configuration-network')){event.preventDefault();target.classList.add('network-drop-target');}};target.ondragleave=()=>target.classList.remove('network-drop-target');target.ondrop=event=>{event.preventDefault();target.classList.remove('network-drop-target');const orderedId=event.dataTransfer.getData('application/x-cmhs-configuration-network'),sourceId=event.dataTransfer.getData('application/x-cmhs-network');if(orderedId&&targetId){moveConfigurationNetworkByDrop(orderedId,targetId,event.clientY>target.getBoundingClientRect().top+target.getBoundingClientRect().height/2);return;}if(sourceId)addLibraryNetworkToConfiguration(sourceId);};};
+      const addItem=(n,configuration=false,networkSource=false)=>{const b=button('',()=>openNetwork(n.id),'network-item'+(n.id===activeId?' active':'')+(configuration?' configuration-network':''));b.title=n.name+'\n'+n.description;b.oncontextmenu=event=>{event.preventDefault();networkContextMenu(event,n.id);};const row=el('div','item-row');row.append(el('span','network-icon','⌘'),el('strong','',n.name));if(configuration)row.append(el('span','configuration-badge','CONFIG'));if(drafts.has(n.id))row.append(el('span','draft-dot'));b.append(row,el('small','',configuration?`${hubFilename} · ${n.nodeCount} elements`:`${n.name.match(/^\d+/)?.[0]||'CMHS'} · ${n.nodeCount} elements`));if(configuration){b.draggable=true;b.ondragstart=event=>{event.dataTransfer.setData('application/x-cmhs-configuration-network',n.id);event.dataTransfer.effectAllowed='move';};acceptLibraryNetwork(b,n.id);}else if(networkSource){b.draggable=true;b.title='Drag this network onto the open configuration to create a configuration copy.';b.ondragstart=event=>{event.dataTransfer.setData('application/x-cmhs-network',n.id);event.dataTransfer.effectAllowed='copy';};}list.append(b);};
       const configurationNetworks=filtered.filter(n=>n.hubManaged);
-      if(configurationNetworks.length){list.append(el('div','catalog-group',`Open configuration · ${hubFilename}`));configurationNetworks.forEach(n=>addItem(n,true));}
-      const groups=[['Imports',n=>/^91/.test(n.name)],['Exports',n=>/^92/.test(n.name)],['Actions & services',n=>!/^9[12]/.test(n.name)]];
-      groups.forEach(([title,test])=>{
-        const items=filtered.filter(n=>!n.hubManaged&&test(n));if(!items.length)return;list.append(el('div','catalog-group',title));
-        items.forEach(n=>addItem(n));
-      });
+      if(hubActive){const header=el('div','catalog-group configuration-drop-target',`Open configuration · ${hubFilename}`);acceptLibraryNetwork(header);list.append(header);configurationNetworks.forEach(n=>addItem(n,true));if(!configurationNetworks.length)list.append(el('p','empty-result','Drag a network from the Library here to add it to this configuration.'));}
+      const libraryNetworks=filtered.filter(n=>!n.hubManaged);
+      if(hubActive&&libraryNetworks.length){list.append(el('div','catalog-group','Network library · drag to configuration'));libraryNetworks.forEach(n=>addItem(n,false,true));}
+      else{const groups=[['Imports',n=>/^91/.test(n.name)],['Exports',n=>/^92/.test(n.name)],['Actions & services',n=>!/^9[12]/.test(n.name)]];groups.forEach(([title,test])=>{const items=filtered.filter(n=>!n.hubManaged&&test(n));if(!items.length)return;list.append(el('div','catalog-group',title));items.forEach(n=>addItem(n));});}
       if(!filtered.length)list.append(el('p','empty-result','No matching networks. Import .mhn files, import a configuration, or create a new network.'));
     }else{
       const defs=data.definitions.filter(d=>(role==='all'||d.role===role)&&(d.typename+' '+d.module+' '+Object.keys(d.parameters).join(' ')).toLowerCase().includes(q));
@@ -277,15 +276,21 @@
     const managed=new Set(managedNetworks().map(network=>network.id));networks=networks.filter(network=>!managed.has(network.id));managed.forEach(id=>drafts.delete(id));store.put('drafts',[...drafts.values()]);hubActive=false;hubXML=data.hub.xml;hubFilename=data.hub.filename||'main.mhc';removedHubKeys.clear();persistHubState();persistConfigurationNetworks();$('modal').close();
     const next=networks.find(network=>network.id===activeId)||networks[0];if(next)openNetwork(next.id);else{activeId=null;model=null;renderCatalog();}toast('Configuration unloaded. Its linked networks were removed from this local workspace.');
   }
-  function reorderConfigurationNetwork(index,direction){
-    const ordered=managedNetworks(),target=index+direction;if(target<0||target>=ordered.length)return false;
-    [ordered[index],ordered[target]]=[ordered[target],ordered[index]];let cursor=0;networks=networks.map(network=>network.hubManaged?ordered[cursor++]:network);synchronizeHub();renderCatalog();return true;
+  function applyConfigurationOrder(ordered){
+    if(ordered.length!==managedNetworks().length)return false;let cursor=0;networks=networks.map(network=>network.hubManaged?ordered[cursor++]:network);synchronizeHub();renderCatalog();return true;
+  }
+  function moveConfigurationNetworkByDrop(sourceId,targetId,after=false){
+    if(sourceId===targetId)return false;const ordered=managedNetworks(),source=ordered.findIndex(network=>network.id===sourceId),target=ordered.findIndex(network=>network.id===targetId);if(source<0||target<0)return false;
+    const [network]=ordered.splice(source,1);const destination=ordered.findIndex(item=>item.id===targetId)+(after?1:0);ordered.splice(destination,0,network);return applyConfigurationOrder(ordered);
+  }
+  function uniqueConfigurationName(value){const base=String(value||'NewNetwork').trim()||'NewNetwork';let name=base,index=2;while(managedNetworks().some(network=>network.name===name))name=`${base}_${index++}`;return name;}
+  function addLibraryNetworkToConfiguration(sourceId){
+    if(!hubActive){toast('Open a configuration before adding a network from the library.',true);return;}const source=networks.find(network=>network.id===sourceId);if(!source)return;
+    let name=uniqueConfigurationName(`${source.name}_Copy`),body=el('div');body.append(el('p','dialog-intro',`Create a configuration copy of ${source.name}. Its elements will receive new serial names.`),field('Network name',name,value=>name=value));
+    modal('Add network to configuration',body,[{text:'Add network',primary:true,run:()=>{const next=String(name||'').trim();if(!next)throw new Error('Enter a network name.');if(managedNetworks().some(network=>network.name===next))throw new Error(`The configuration already contains a network named “${next}”.`);const added=addNetwork(source.xml,source.filename,{hubManaged:true,name:next,asDraft:true});synchronizeHub();$('modal').close();openNetwork(added.id);flushDrafts();setTab('networks');toast(`Added ${next} to the open configuration.`);}}]);
   }
   function hubDialog(){
     const body=el('div'),input=el('textarea','code-editor mono');input.value=hubXML;body.append(el('p','dialog-intro',hubActive?'This open configuration is kept synchronized with its loaded networks. Exporting the configuration includes the .mhc and every registered .mhn file. Unloading it removes only its linked networks from this local workspace.':'Global variables and network registrations from main.mhc. Import a configuration folder to load its linked networks together.'));
-    if(hubActive){
-      const order=el('div','v2-file-list'),refreshOrder=()=>{order.replaceChildren();const ordered=managedNetworks();ordered.forEach((network,index)=>{const row=el('div','item-row'),name=el('strong','',network.name),up=button('↑',()=>{if(reorderConfigurationNetwork(index,-1)){input.value=hubXML;refreshOrder();}},'mini-button'),down=button('↓',()=>{if(reorderConfigurationNetwork(index,1)){input.value=hubXML;refreshOrder();}},'mini-button');up.disabled=index===0;down.disabled=index===ordered.length-1;row.append(name,up,down);order.append(row);});};body.append(el('p','dialog-intro','Configuration network sequence'),order);refreshOrder();
-    }
     body.append(input);const actions=[];if(hubActive)actions.push({text:'Unload configuration',run:()=>unloadConfiguration()});actions.push({text:'Save local draft',run:()=>{if(parseXML(input.value).documentElement.tagName!=='messagehub')throw new Error('The root must be messagehub.');hubXML=input.value;const ok=persistHubState();$('modal').close();toast(ok?'Hub draft saved locally.':'Hub draft kept for this session.',!ok);}},{text:'Export .mhc',primary:true,run:()=>{if(parseXML(input.value).documentElement.tagName!=='messagehub')throw new Error('The root must be messagehub.');hubXML=input.value;download(hubActive?synchronizeHub():hubXML,hubFilename,'application/xml');}});modal('Hub configuration',body,actions);
   }
   function newNetwork(){let name='NewNetwork';const body=el('div');body.append(field('Network name',name,v=>name=v),el('p','dialog-intro',hubActive?'The new network will be added to the open configuration.':'Start from an empty network, then choose a source from the library.'));modal('New network',body,[{text:'Create network',primary:true,run:()=>{if(!name.trim())throw new Error('Enter a network name.');const next=uniqueNetworkName(name);if(next!==name)throw new Error(`A network named “${name}” already exists.`);const doc=NetworkDocument.empty(name),id='custom:'+Date.now()+'.mhn',network={id,name,filename:name+'.mhn',xml:doc.toXML(),description:'',nodeCount:0,connectionCount:0,imported:true,hubManaged:hubActive,hubKey:null};networks.push(network);if(hubActive)synchronizeHub();$('modal').close();openNetwork(id);saveDraft();setTab('library');}}]);}

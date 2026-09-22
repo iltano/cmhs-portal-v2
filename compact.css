@@ -1,4 +1,5 @@
 .network-item strong{overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+.network-library-card[draggable=true],.configuration-network[draggable=true]{cursor:grab}.network-drop-target{outline:2px dashed var(--teal);outline-offset:2px;background:var(--teal-light)!important}.configuration-drop-target{border-radius:6px}
 @media(max-height:900px) and (min-width:801px){
   :root{font-size:12px}
   .app-header{height:58px;padding:0 16px;gap:16px}

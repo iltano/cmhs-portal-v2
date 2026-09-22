@@ -32,7 +32,7 @@ New, copied, and renamed elements use a component type plus serial convention, f
 
 **Import configuration** opens the `.mhc` and only the `.mhn` files it registers. Imported configuration network names are preserved. Duplicate network names within one configuration are rejected.
 
-Use **Hub configuration** to review the configuration XML, move networks up or down in its registration sequence, or unload the configuration from the browser workspace. The lower-left **Unload configuration** action removes its linked networks from the local workspace.
+Use **Hub configuration** to review the configuration XML or unload the configuration from the browser workspace. Drag configuration entries in the left panel to change their registration sequence. When a configuration is open, the same panel includes a **Network library**: drag a network from it onto the configuration to create a named configuration copy. The lower-left **Unload configuration** action removes linked networks from the local workspace.
 
 ## Export choices
 
