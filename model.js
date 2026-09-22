@@ -42,16 +42,9 @@
     if (!Number.isFinite(Number(value))) throw new Error('Coordinates must be finite numbers.');
     return Math.max(minimum, Math.round(Number(value)));
   }
-  function rebasedName(name, typename, oldNetwork, newNetwork) {
-    const oldValue = String(name || typename || 'Element').trim();
-    const aliases = value => [...new Set([value, value.replace(/^(\d+)W(?=_)/, '$1')])].sort((a,b) => b.length-a.length);
-    let base = oldValue;
-    for (const oldAlias of aliases(oldNetwork)) {
-      const escaped = oldAlias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const match = oldValue.match(new RegExp('^(.*)_' + escaped + '(?:_.+)?$'));
-      if (match?.[1]) { base = match[1]; break; }
-    }
-    return base || typename || 'Element';
+  function elementName(typename) {
+    const value = String(typename || 'Element').trim();
+    return value.replace(/(?:Processor|Producer|Consumer)$/, '') || value;
   }
   class NetworkDocument {
     constructor(xml, filename = 'network.mhn') {
@@ -117,10 +110,9 @@
       if (oldName === newName) return;
       const nodes = this.nodes, used = new Set(), serials = new Map(), changes = new Map();
       nodes.forEach(node => {
-        const base = rebasedName(node.getAttribute('name'), node.getAttribute('typename'), oldName, newName);
-        const key = `${base}\u0000${newName}`;let index = serials.get(key) || 1, candidate = `${base}_${newName}_${index}`;
-        while (used.has(candidate)) candidate = `${base}_${newName}_${++index}`;
-        serials.set(key,index+1);used.add(candidate); changes.set(node.getAttribute('name'), candidate);
+        const base = elementName(node.getAttribute('typename'));let index = serials.get(base) || 1, candidate = `${base}_${index}`;
+        while (used.has(candidate)) candidate = `${base}_${++index}`;
+        serials.set(base,index+1);used.add(candidate); changes.set(node.getAttribute('name'), candidate);
       });
       nodes.forEach(node => node.setAttribute('name', changes.get(node.getAttribute('name'))));
       this.edges.forEach(edge => ['producer', 'consumer'].forEach(attribute => edge.setAttribute(attribute, changes.get(edge.getAttribute(attribute)) || edge.getAttribute(attribute))));

@@ -62,8 +62,9 @@
     return name;
   }
   function addNetwork(xml,filename,options={}){
-    const document=new NetworkDocument(xml,filename),requested=options.name||document.name,name=uniqueNetworkName(requested);
-    const renamed=name!==document.name;if(renamed)document.renameNetwork(name);
+    const document=new NetworkDocument(xml,filename),requested=options.name||document.name;
+    if(options.hubManaged&&managedNetworks().some(network=>network.name===requested))throw new Error(`The configuration already contains a network named “${requested}”.`);
+    const name=options.hubManaged?requested:uniqueNetworkName(requested),renamed=name!==document.name;if(renamed)document.renameNetwork(name);
     document.filename=renamed?`${name}.mhn`:filename;
     const id=options.id||`import:${Date.now()}:${filename}:${networks.length}`,network={id,filename:document.filename,name:document.name,xml:document.toXML(),description:document.description,nodeCount:document.nodes.length,connectionCount:document.edges.length,imported:true,hubManaged:!!options.hubManaged,hubKey:options.hubKey||null};
     networks.push(network);drafts.set(id,{...network});return network;
@@ -274,7 +275,17 @@
     const managed=new Set(managedNetworks().map(network=>network.id));networks=networks.filter(network=>!managed.has(network.id));managed.forEach(id=>drafts.delete(id));store.put('drafts',[...drafts.values()]);hubActive=false;hubXML=data.hub.xml;hubFilename=data.hub.filename||'main.mhc';removedHubKeys.clear();persistHubState();$('modal').close();
     const next=networks.find(network=>network.id===activeId)||networks[0];if(next)openNetwork(next.id);else{activeId=null;model=null;renderCatalog();}toast('Configuration unloaded. Its linked networks were removed from this local workspace.');
   }
-  function hubDialog(){const body=el('div'),input=el('textarea','code-editor mono');input.value=hubXML;body.append(el('p','dialog-intro',hubActive?'This open configuration is kept synchronized with its loaded networks. Exporting the configuration includes the .mhc and every registered .mhn file. Unloading it removes only its linked networks from this local workspace.':'Global variables and network registrations from main.mhc. Import a configuration folder to load its linked networks together.'),input);const actions=[];if(hubActive)actions.push({text:'Unload configuration',run:()=>unloadConfiguration()});actions.push({text:'Save local draft',run:()=>{if(parseXML(input.value).documentElement.tagName!=='messagehub')throw new Error('The root must be messagehub.');hubXML=input.value;const ok=persistHubState();$('modal').close();toast(ok?'Hub draft saved locally.':'Hub draft kept for this session.',!ok);}},{text:'Export .mhc',primary:true,run:()=>{if(parseXML(input.value).documentElement.tagName!=='messagehub')throw new Error('The root must be messagehub.');hubXML=input.value;download(hubActive?synchronizeHub():hubXML,hubFilename,'application/xml');}});modal('Hub configuration',body,actions);}
+  function reorderConfigurationNetwork(index,direction){
+    const ordered=managedNetworks(),target=index+direction;if(target<0||target>=ordered.length)return false;
+    [ordered[index],ordered[target]]=[ordered[target],ordered[index]];let cursor=0;networks=networks.map(network=>network.hubManaged?ordered[cursor++]:network);synchronizeHub();renderCatalog();return true;
+  }
+  function hubDialog(){
+    const body=el('div'),input=el('textarea','code-editor mono');input.value=hubXML;body.append(el('p','dialog-intro',hubActive?'This open configuration is kept synchronized with its loaded networks. Exporting the configuration includes the .mhc and every registered .mhn file. Unloading it removes only its linked networks from this local workspace.':'Global variables and network registrations from main.mhc. Import a configuration folder to load its linked networks together.'));
+    if(hubActive){
+      const order=el('div','v2-file-list'),refreshOrder=()=>{order.replaceChildren();const ordered=managedNetworks();ordered.forEach((network,index)=>{const row=el('div','item-row'),name=el('strong','',network.name),up=button('↑',()=>{if(reorderConfigurationNetwork(index,-1)){input.value=hubXML;refreshOrder();}},'mini-button'),down=button('↓',()=>{if(reorderConfigurationNetwork(index,1)){input.value=hubXML;refreshOrder();}},'mini-button');up.disabled=index===0;down.disabled=index===ordered.length-1;row.append(name,up,down);order.append(row);});};body.append(el('p','dialog-intro','Configuration network sequence'),order);refreshOrder();
+    }
+    body.append(input);const actions=[];if(hubActive)actions.push({text:'Unload configuration',run:()=>unloadConfiguration()});actions.push({text:'Save local draft',run:()=>{if(parseXML(input.value).documentElement.tagName!=='messagehub')throw new Error('The root must be messagehub.');hubXML=input.value;const ok=persistHubState();$('modal').close();toast(ok?'Hub draft saved locally.':'Hub draft kept for this session.',!ok);}},{text:'Export .mhc',primary:true,run:()=>{if(parseXML(input.value).documentElement.tagName!=='messagehub')throw new Error('The root must be messagehub.');hubXML=input.value;download(hubActive?synchronizeHub():hubXML,hubFilename,'application/xml');}});modal('Hub configuration',body,actions);
+  }
   function newNetwork(){let name='NewNetwork';const body=el('div');body.append(field('Network name',name,v=>name=v),el('p','dialog-intro',hubActive?'The new network will be added to the open configuration.':'Start from an empty network, then choose a source from the library.'));modal('New network',body,[{text:'Create network',primary:true,run:()=>{if(!name.trim())throw new Error('Enter a network name.');const next=uniqueNetworkName(name);if(next!==name)throw new Error(`A network named “${name}” already exists.`);const doc=NetworkDocument.empty(name),id='custom:'+Date.now()+'.mhn',network={id,name,filename:name+'.mhn',xml:doc.toXML(),description:'',nodeCount:0,connectionCount:0,imported:true,hubManaged:hubActive,hubKey:null};networks.push(network);if(hubActive)synchronizeHub();$('modal').close();openNetwork(id);saveDraft();setTab('library');}}]);}
   function duplicateNetwork(){
     const original=networks.find(network=>network.id===activeId),base=`${model.name}_Copy`,name=uniqueNetworkName(base),copy=new NetworkDocument(model.toXML(),model.filename);
@@ -315,11 +326,12 @@
     const parsed=[];for(const file of files){if(!/\.(mhn|mhc|xml)$/i.test(file.name))continue;try{const xml=await file.text(),doc=parseXML(xml);parsed.push({file,xml,doc});}catch(e){toast(`${file.name}: ${e.message}`,true);}}
     const hub=parsed.find(entry=>entry.doc.documentElement.tagName==='messagehub');let count=0,last=null,linked=new Set();
     if(hub){
+      if(hubActive)unloadConfiguration();
       hubXML=hub.xml;hubFilename=hub.file.name;hubActive=true;removedHubKeys.clear();const registrations=children(child(hub.doc.documentElement,'networks'),'network');
-      registrations.forEach(registration=>{const filename=registration.getAttribute('filename')||'',match=parsed.find(entry=>entry!==hub&&entry.doc.documentElement.tagName==='messagehubnetwork'&&entry.file.name.toLowerCase()===filename.toLowerCase());if(!match)return;try{const network=addNetwork(match.xml,match.file.name,{hubManaged:true,hubKey:registrationKey(filename,registration.getAttribute('name'))});count++;last=network.id;linked.add(match);}catch(error){toast(`${match.file.name}: ${error.message}`,true);}});
+      registrations.forEach(registration=>{const filename=registration.getAttribute('filename')||'',match=parsed.find(entry=>entry!==hub&&entry.doc.documentElement.tagName==='messagehubnetwork'&&entry.file.name.toLowerCase()===filename.toLowerCase());if(!match)return;linked.add(match);try{const network=addNetwork(match.xml,match.file.name,{hubManaged:true,hubKey:registrationKey(filename,registration.getAttribute('name'))});count++;last=network.id;}catch(error){toast(`${match.file.name}: ${error.message}`,true);}});
       synchronizeHub();const missing=registrations.length-count;if(missing)toast(`${missing} linked network${missing===1?' was':'s were'} not selected. Choose the configuration folder or select the .mhc and all registered .mhn files together.`,true);
     }
-    parsed.filter(entry=>entry!==hub&&!linked.has(entry)&&entry.doc.documentElement.tagName==='messagehubnetwork').forEach(entry=>{try{const network=addNetwork(entry.xml,entry.file.name);count++;last=network.id;}catch(error){toast(`${entry.file.name}: ${error.message}`,true);}});
+    if(!hub)parsed.filter(entry=>entry.doc.documentElement.tagName==='messagehubnetwork').forEach(entry=>{try{const network=addNetwork(entry.xml,entry.file.name);count++;last=network.id;}catch(error){toast(`${entry.file.name}: ${error.message}`,true);}});
     if(last){openNetwork(last);flushDrafts();setTab('networks');toast(hub?`Opened configuration with ${count} linked network${count===1?'':'s'}.`:`Imported ${count} network${count===1?'':'s'} as local drafts.`);}
     else if(hub){persistHubState();toast('Configuration imported. Select its folder or its registered .mhn files to load the linked networks.',true);}
   }

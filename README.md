@@ -46,7 +46,7 @@ The exported file is a new copy; the original file on your computer is not modif
 
 ## Full MessageHub configurations
 
-Use **Import configuration** to choose a folder containing one `.mhc` file and its registered `.mhn` files. The portal opens the linked networks together. **Export configuration** creates a ZIP with the `.mhc` and linked `.mhn` files in the same folder, plus any selected XSL, CQMS, or CPMS files. **Hub configuration** includes an unload action that removes only the linked configuration networks from this browser workspace.
+Use **Import configuration** to choose a folder containing one `.mhc` file and its registered `.mhn` files. The portal preserves those network names and rejects duplicate names within the configuration. **Export configuration** creates a ZIP with the `.mhc` and linked `.mhn` files in the same folder, plus any selected XSL, CQMS, or CPMS files. **Hub configuration** includes an unload action and up/down controls for the configuration network sequence.
 
 Network Settings can rename, duplicate, or delete a network. Renaming also updates each element name and its connection references. New and duplicated networks are registered in the exported hub configuration; deleted networks are removed from it.
 
