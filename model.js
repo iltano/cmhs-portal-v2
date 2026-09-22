@@ -44,11 +44,14 @@
   }
   function rebasedName(name, typename, oldNetwork, newNetwork) {
     const oldValue = String(name || typename || 'Element').trim();
-    const escaped = oldNetwork.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    let next = oldValue.replace(new RegExp('(^|_)' + escaped + '(?=_|$)', 'g'), (_, prefix) => prefix + newNetwork);
-    if (next !== oldValue) return next;
-    const suffix = next.match(/_(\d+)$/);
-    return suffix ? `${next.slice(0, -suffix[0].length)}_${newNetwork}${suffix[0]}` : `${next}_${newNetwork}`;
+    const aliases = value => [...new Set([value, value.replace(/^(\d+)W(?=_)/, '$1')])].sort((a,b) => b.length-a.length);
+    let base = oldValue;
+    for (const oldAlias of aliases(oldNetwork)) {
+      const escaped = oldAlias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const match = oldValue.match(new RegExp('^(.*)_' + escaped + '(?:_.+)?$'));
+      if (match?.[1]) { base = match[1]; break; }
+    }
+    return base || typename || 'Element';
   }
   class NetworkDocument {
     constructor(xml, filename = 'network.mhn') {
@@ -112,12 +115,12 @@
       validName(newName);
       const oldName = this.name;
       if (oldName === newName) return;
-      const nodes = this.nodes, used = new Set(), changes = new Map();
+      const nodes = this.nodes, used = new Set(), serials = new Map(), changes = new Map();
       nodes.forEach(node => {
         const base = rebasedName(node.getAttribute('name'), node.getAttribute('typename'), oldName, newName);
-        let candidate = base, index = 1;
-        while (used.has(candidate)) candidate = `${base}_${index++}`;
-        used.add(candidate); changes.set(node.getAttribute('name'), candidate);
+        const key = `${base}\u0000${newName}`;let index = serials.get(key) || 1, candidate = `${base}_${newName}_${index}`;
+        while (used.has(candidate)) candidate = `${base}_${newName}_${++index}`;
+        serials.set(key,index+1);used.add(candidate); changes.set(node.getAttribute('name'), candidate);
       });
       nodes.forEach(node => node.setAttribute('name', changes.get(node.getAttribute('name'))));
       this.edges.forEach(edge => ['producer', 'consumer'].forEach(attribute => edge.setAttribute(attribute, changes.get(edge.getAttribute(attribute)) || edge.getAttribute(attribute))));

@@ -3,7 +3,7 @@
 <head>
  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
  <title>CMHS Studio v2 · Network editor</title>
- <link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css">
+ <link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="compact.css">
 </head>
 <body>
  <section id="beta-screen" class="beta-screen" hidden aria-labelledby="beta-title">
@@ -29,7 +29,7 @@
    <div class="side-search"><input id="catalog-search" type="search" placeholder="Search networks…" aria-label="Search networks or element library"><span>⌕</span></div>
    <div id="library-filter" class="role-filters" hidden><button data-role="all" class="active">All</button><button data-role="producer">Sources</button><button data-role="processor">Processors</button><button data-role="consumer">Outputs</button></div>
    <div id="catalog-list" class="catalog-list"></div>
-   <div class="sidebar-footer"><button id="new-btn">＋ New network</button><button id="refresh-library-btn" class="quiet">↻ Update workspace library</button><button id="hub-btn" class="quiet">Hub configuration ↗</button><a href="data/elements.sqlite" download="cmhs-elements.sqlite">Download element database ↓</a></div>
+   <div class="sidebar-footer"><button id="new-btn">＋ New network</button><button id="refresh-library-btn" class="quiet">↻ Update workspace library</button><button id="hub-btn" class="quiet">Hub configuration ↗</button><button id="unload-configuration-btn" class="danger" hidden>⌫ Unload configuration</button><a href="data/elements.sqlite" download="cmhs-elements.sqlite">Download element database ↓</a></div>
   </aside>
   <section class="editor">
    <div class="network-heading"><div><div class="eyebrow" id="network-family">NETWORK</div><h1 id="network-title">Loading workspace…</h1><p id="network-description"></p></div><button id="network-settings-btn" title="Edit network settings">⚙ Settings</button></div>

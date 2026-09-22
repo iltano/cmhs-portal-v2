@@ -12,7 +12,7 @@ CMHS Portal v2 provides a visual way to inspect, understand, modify, and export 
 * Add elements from the built-in component library.
 * Copy and reuse configured elements between networks.
 * Create new networks from existing examples or from scratch.
-* Open a configuration folder containing an `.mhc` file and its linked `.mhn` networks.
+* Open or unload a configuration folder containing an `.mhc` file and its linked `.mhn` networks.
 * Rename, duplicate, or remove networks while synchronizing their hub registrations.
 * Rearrange network diagrams automatically or manually.
 * Create and modify connections between elements.
@@ -46,7 +46,7 @@ The exported file is a new copy; the original file on your computer is not modif
 
 ## Full MessageHub configurations
 
-Use **Configuration** to choose a folder containing one `.mhc` file and its registered `.mhn` files. The portal opens the linked networks together. Saving from one of those networks exports a ZIP containing the updated `.mhc`, every linked `.mhn`, and any selected XSL, CQMS, or CPMS files.
+Use **Import configuration** to choose a folder containing one `.mhc` file and its registered `.mhn` files. The portal opens the linked networks together. **Export configuration** creates a ZIP with the `.mhc` and linked `.mhn` files in the same folder, plus any selected XSL, CQMS, or CPMS files. **Hub configuration** includes an unload action that removes only the linked configuration networks from this browser workspace.
 
 Network Settings can rename, duplicate, or delete a network. Renaming also updates each element name and its connection references. New and duplicated networks are registered in the exported hub configuration; deleted networks are removed from it.
 

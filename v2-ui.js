@@ -55,7 +55,7 @@
    if(createXSL?.checked)chosen.filter(p=>p.input.checked).forEach(p=>{(xslNodes[p.id]??=[]).push(p.name);(xslDecorators[p.id]??=Object.create(null))[p.name]=p.querySource.value;});
    if(createXSL?.checked&&!Object.keys(xslNodes).length)throw Error('Select at least one XSL processor.');
    if(createCQMS?.checked)queryFields.forEach(d=>{if(!d.input.value.trim())throw Error(`Define queries for ${d.network} / ${d.name}.`);E.queryRows(d.input.value).forEach(row=>{if((row.network&&row.network!==d.network)||(row.decorator&&row.decorator!==d.name))throw Error(`Query mapping does not match ${d.network} / ${d.name}.`);queryMappings.push({...row,network:d.network,decorator:d.name});});});
-   const result=E.bundle(docs,{xslNodes,xslDecorators,cqms:!!createCQMS?.checked,cpms:!!createCPMS.checked,queryMappings,templates:CMHS_TEMPLATES});
+   const result=E.bundle(docs,{xslNodes,xslDecorators,cqms:!!createCQMS?.checked,cpms:!!createCPMS.checked,queryMappings,templates:CMHS_TEMPLATES,networkFolder:configuration?'':'networks/'});
    if(configuration){if(result.files.some(file=>file.name===configuration.filename))throw Error(`Configuration filename collision: ${configuration.filename}.`);result.files.push({name:configuration.filename,text:configuration.xml});}
    result.mappingPreview=queryMappings.map(q=>`${q.network} / ${q.decorator} → Custom/CMHS/${q.network}/${q.queryname}`).join('\n');return result;
   };

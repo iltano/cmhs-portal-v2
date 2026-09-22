@@ -290,7 +290,7 @@
 
  }
 
- function bundle(documents,{xslNodes={},xslDecorators={},cqms=false,cpms=false,csvText='',queryMappings=null,templates}={}){
+ function bundle(documents,{xslNodes={},xslDecorators={},cqms=false,cpms=false,csvText='',queryMappings=null,templates,networkFolder='networks/'}={}){
 
   const rows=cqms?(queryMappings||queryRows(csvText)):[],files=[],updates=[],seen=new Set();
 
@@ -316,7 +316,7 @@
 
     add(`Stylesheets/${filename}/${xslname}`,generateXSL(network,templates.xsl,selectedQueries));const params=m.parameters(n.getAttribute('name')),i=params.findIndex(p=>p.getAttribute('name')==='filename');m.setParameter(n.getAttribute('name'),i<0?params.length:i,'filename',`%XSLDIR%\\%NETWORKNAME%\\%NETWORKNAME%_${suffix}.xsl`);
 
-   }add(`networks/${filename}.mhn`,m.toXML());updates.push({id:item.id,xml:m.toXML()});
+   }add(`${networkFolder}${filename}.mhn`,m.toXML());updates.push({id:item.id,xml:m.toXML()});
 
   }if(cpms){assert(templates?.cpms,'CPMS template is unavailable.');add('CPMS/cmhs-process-config.xml',generateCPMS(parsed.map(({model:m})=>m.name),templates.cpms));}return{files,updates};
 
