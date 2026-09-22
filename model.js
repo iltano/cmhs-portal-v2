@@ -2,6 +2,7 @@
 (function (global) {
   'use strict';
   const roles = ['producer', 'processor', 'consumer'];
+  const MIN_X = 5, MIN_Y = 6;
   const children = (el, name) => [...(el?.children || [])].filter(e => e.tagName === name);
   const child = (el, name) => children(el, name)[0] || null;
   function parseXML(xml) {
@@ -37,6 +38,18 @@
     }
     return base;
   }
+  function coordinate(value, minimum) {
+    if (!Number.isFinite(Number(value))) throw new Error('Coordinates must be finite numbers.');
+    return Math.max(minimum, Math.round(Number(value)));
+  }
+  function rebasedName(name, typename, oldNetwork, newNetwork) {
+    const oldValue = String(name || typename || 'Element').trim();
+    const escaped = oldNetwork.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    let next = oldValue.replace(new RegExp('(^|_)' + escaped + '(?=_|$)', 'g'), (_, prefix) => prefix + newNetwork);
+    if (next !== oldValue) return next;
+    const suffix = next.match(/_(\d+)$/);
+    return suffix ? `${next.slice(0, -suffix[0].length)}_${newNetwork}${suffix[0]}` : `${next}_${newNetwork}`;
+  }
   class NetworkDocument {
     constructor(xml, filename = 'network.mhn') {
       this.filename = filename;
@@ -44,6 +57,7 @@
       if (this.doc.documentElement.tagName !== 'messagehubnetwork') throw new Error('This is not a .mhn network. Use Hub configuration for a .mhc file.');
       this.setup = child(this.doc.documentElement, 'setup');
       if (!this.setup) throw new Error('The network has no setup element.');
+      this.normalizeCoordinates();
     }
     get nodes() {
       return [...children(this.setup, 'producer'), ...children(child(this.setup, 'processors'), 'processor'), ...children(child(this.setup, 'consumers'), 'consumer')];
@@ -53,7 +67,18 @@
     get name() { return this.variables.find(v => v.getAttribute('name') === 'NETWORKNAME')?.getAttribute('value') || this.filename.replace(/\.mhn$/i, ''); }
     get description() { return child(this.setup, 'description')?.textContent || ''; }
     node(name) { return this.nodes.find(e => e.getAttribute('name') === name); }
-    position(node) { return { x: Number(node.getAttribute('x')) || 0, y: Number(node.getAttribute('y')) || 0 }; }
+    position(node) { return { x: Math.max(MIN_X, Number(node.getAttribute('x')) || MIN_X), y: Math.max(MIN_Y, Number(node.getAttribute('y')) || MIN_Y) }; }
+    normalizeCoordinates() {
+      const positioned = this.nodes.filter(node => Number.isFinite(Number(node.getAttribute('x'))) && Number.isFinite(Number(node.getAttribute('y'))));
+      if (!positioned.length) return;
+      const minX = Math.min(...positioned.map(node => Number(node.getAttribute('x'))));
+      const minY = Math.min(...positioned.map(node => Number(node.getAttribute('y'))));
+      const shiftX = Math.max(0, MIN_X - minX), shiftY = Math.max(0, MIN_Y - minY);
+      positioned.forEach(node => {
+        node.setAttribute('x', String(coordinate(Number(node.getAttribute('x')) + shiftX, MIN_X)));
+        node.setAttribute('y', String(coordinate(Number(node.getAttribute('y')) + shiftY, MIN_Y)));
+      });
+    }
     ensure(parent, tag) {
       let el = child(parent, tag);
       if (!el) {
@@ -83,16 +108,36 @@
       this.edges.forEach(e => ['producer', 'consumer'].forEach(a => { if (e.getAttribute(a) === oldName) e.setAttribute(a, newName); }));
       return node;
     }
+    renameNetwork(newName) {
+      validName(newName);
+      const oldName = this.name;
+      if (oldName === newName) return;
+      const nodes = this.nodes, used = new Set(), changes = new Map();
+      nodes.forEach(node => {
+        const base = rebasedName(node.getAttribute('name'), node.getAttribute('typename'), oldName, newName);
+        let candidate = base, index = 1;
+        while (used.has(candidate)) candidate = `${base}_${index++}`;
+        used.add(candidate); changes.set(node.getAttribute('name'), candidate);
+      });
+      nodes.forEach(node => node.setAttribute('name', changes.get(node.getAttribute('name'))));
+      this.edges.forEach(edge => ['producer', 'consumer'].forEach(attribute => edge.setAttribute(attribute, changes.get(edge.getAttribute(attribute)) || edge.getAttribute(attribute))));
+      let variable = this.variables.find(v => v.getAttribute('name') === 'NETWORKNAME');
+      if (!variable) {
+        variable = this.doc.createElement('variable');
+        variable.setAttribute('name', 'NETWORKNAME');
+        this.ensure(this.setup, 'variables').appendChild(variable);
+      }
+      variable.setAttribute('value', newName);
+    }
     move(name, x, y) {
-      if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error('Coordinates must be finite numbers.');
       const node = this.node(name);
       if (!node) throw new Error('Element not found.');
-      node.setAttribute('x', String(Math.round(x))); node.setAttribute('y', String(Math.round(y)));
+      node.setAttribute('x', String(coordinate(x, MIN_X))); node.setAttribute('y', String(coordinate(y, MIN_Y)));
     }
     add(xml, x, y, sourceNetwork = '') {
       const source = parseXML(xml).documentElement;
       if (!roles.includes(source.tagName)) throw new Error('An element template must be a producer, processor or consumer.');
-      if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error('Coordinates must be finite numbers.');
+      coordinate(x, MIN_X); coordinate(y, MIN_Y);
       const node = this.doc.importNode(source, true);
       const previous = source.tagName === 'producer' ? children(this.setup, 'producer')[0] : null;
       if (previous) {
@@ -101,7 +146,7 @@
         previous.replaceWith(node);
       } else {
         node.setAttribute('name', this.uniqueName(additionName(node.getAttribute('name'), node.getAttribute('typename'), this.name, sourceNetwork)));
-        node.setAttribute('x', String(Math.round(x))); node.setAttribute('y', String(Math.round(y)));
+        node.setAttribute('x', String(coordinate(x, MIN_X))); node.setAttribute('y', String(coordinate(y, MIN_Y)));
         if (node.tagName === 'producer') {
           const next = child(this.setup, 'processors') || child(this.setup, 'consumers') || child(this.setup, 'connections');
           this.setup.insertBefore(node, next);
@@ -150,7 +195,8 @@
       if (replacement.tagName !== current.tagName) throw new Error('Keep the same role when editing XML. Use the library to replace a producer or add a different role.');
       const newName = replacement.getAttribute('name'); validName(newName);
       if (newName !== name && this.node(newName)) throw new Error('An element with that name already exists.');
-      for (const key of ['x', 'y']) if (!Number.isFinite(Number(replacement.getAttribute(key)))) throw new Error('Element coordinates must be numbers.');
+      replacement.setAttribute('x', String(coordinate(replacement.getAttribute('x'), MIN_X)));
+      replacement.setAttribute('y', String(coordinate(replacement.getAttribute('y'), MIN_Y)));
       const imported = this.doc.importNode(replacement, true);
       this.rename(name, newName); current.replaceWith(imported);
       return newName;
@@ -207,5 +253,5 @@
     undo(current) { if(!this.past.length)return null;this.future.push(current);return this.past.pop(); }
     redo(current) { if(!this.future.length)return null;this.past.push(current);return this.future.pop(); }
   }
-  global.CMHS = {NetworkDocument,History,parseXML,serialize,serializeDocument,withXMLDeclaration,children,child,additionName};
+  global.CMHS = {NetworkDocument,History,parseXML,serialize,serializeDocument,withXMLDeclaration,children,child,additionName,MIN_X,MIN_Y};
 })(window);

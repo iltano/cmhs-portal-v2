@@ -12,6 +12,8 @@ CMHS Portal v2 provides a visual way to inspect, understand, modify, and export 
 * Add elements from the built-in component library.
 * Copy and reuse configured elements between networks.
 * Create new networks from existing examples or from scratch.
+* Open a configuration folder containing an `.mhc` file and its linked `.mhn` networks.
+* Rename, duplicate, or remove networks while synchronizing their hub registrations.
 * Rearrange network diagrams automatically or manually.
 * Create and modify connections between elements.
 * Validate network structure before export.
@@ -42,6 +44,12 @@ This means that opening a MessageHub configuration in the editor does not send i
 
 The exported file is a new copy; the original file on your computer is not modified.
 
+## Full MessageHub configurations
+
+Use **Configuration** to choose a folder containing one `.mhc` file and its registered `.mhn` files. The portal opens the linked networks together. Saving from one of those networks exports a ZIP containing the updated `.mhc`, every linked `.mhn`, and any selected XSL, CQMS, or CPMS files.
+
+Network Settings can rename, duplicate, or delete a network. Renaming also updates each element name and its connection references. New and duplicated networks are registered in the exported hub configuration; deleted networks are removed from it.
+
 ## Example networks
 
 The application includes anonymized example configurations intended to demonstrate common MessageHub network structures and component types. They are bundled into the offline catalog, so the published site does not need the raw example source folder.
@@ -69,9 +77,13 @@ Depending on the component, its configuration can include properties such as:
 
 Values shown in example components are templates and should be reviewed before use in a real MessageHub environment.
 
+Use **Update workspace library** after importing or editing networks to add their configured elements to the reusable library stored in your browser.
+
 ## Network editing
 
 Network elements can be positioned visually and connected directly in the workspace.
+
+CMHS coordinates use positive integers: `x` increases to the right and `y` increases downward. The canvas origin is `0,0`; elements begin at `5,6`, and imported negative coordinates are shifted into that valid area.
 
 When elements are copied between networks, CMHS Portal adjusts generated names where necessary to keep them unique within the destination network.
 

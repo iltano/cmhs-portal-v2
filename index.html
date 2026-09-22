@@ -21,7 +21,7 @@
 
   <a class="brand" href="./index.html" aria-label="CMHS Studio home"><span class="brand-icon">◇</span><span>CMHS <strong>Studio</strong><sup class="version-badge">v2</sup><small>NETWORK WORKSPACE</small></span></a>
   <div class="header-divider"></div><span class="local-badge"><i></i>Local workspace</span>
-  <div class="header-actions"><button id="help-btn" class="quiet">Guide <kbd>?</kbd></button><button id="import-btn">↑ Import XML</button><button id="export-btn" class="primary">↓ Save / Export</button></div>
+  <div class="header-actions"><button id="help-btn" class="quiet">Guide <kbd>?</kbd></button><button id="import-btn" title="Import one or more Message Hub Network files">↑ Import .mhn</button><button id="configuration-import-btn" title="Choose a folder containing an .mhc file and its linked .mhn files">↑ Import configuration</button><button id="export-networks-btn">↓ Export updated networks</button><button id="export-configuration-btn" class="primary">↓ Export configuration</button></div>
  </header>
  <main class="workspace">
   <aside class="sidebar">
@@ -29,7 +29,7 @@
    <div class="side-search"><input id="catalog-search" type="search" placeholder="Search networks…" aria-label="Search networks or element library"><span>⌕</span></div>
    <div id="library-filter" class="role-filters" hidden><button data-role="all" class="active">All</button><button data-role="producer">Sources</button><button data-role="processor">Processors</button><button data-role="consumer">Outputs</button></div>
    <div id="catalog-list" class="catalog-list"></div>
-   <div class="sidebar-footer"><button id="new-btn">＋ New network</button><button id="hub-btn" class="quiet">Hub configuration ↗</button><a href="data/elements.sqlite" download="cmhs-elements.sqlite">Download element database ↓</a></div>
+   <div class="sidebar-footer"><button id="new-btn">＋ New network</button><button id="refresh-library-btn" class="quiet">↻ Update workspace library</button><button id="hub-btn" class="quiet">Hub configuration ↗</button><a href="data/elements.sqlite" download="cmhs-elements.sqlite">Download element database ↓</a></div>
   </aside>
   <section class="editor">
    <div class="network-heading"><div><div class="eyebrow" id="network-family">NETWORK</div><h1 id="network-title">Loading workspace…</h1><p id="network-description"></p></div><button id="network-settings-btn" title="Edit network settings">⚙ Settings</button></div>
@@ -46,7 +46,8 @@
   <aside id="inspector" class="inspector" aria-label="Properties panel"></aside>
  </main>
  <div id="toast" class="toast" role="status" hidden></div>
- <input type="file" id="file-input" accept=".mhn,.mhc,.xml" multiple hidden>
+ <input type="file" id="file-input" accept=".mhn" multiple hidden>
+ <input type="file" id="configuration-input" accept=".mhn,.mhc,.xml" webkitdirectory directory multiple hidden>
  <dialog id="modal"><form method="dialog" class="dialog-shell"><header><div><span class="eyebrow" id="modal-eyebrow">WORKSPACE</span><h2 id="modal-title"></h2></div><button value="cancel" class="dialog-close" aria-label="Close">×</button></header><div id="modal-body"></div><footer id="modal-footer"></footer></form></dialog>
  <script src="aa49e6b992f6ff07a7a753f4688f19a5.js"></script><script src="data/catalog.js"></script><script src="data/templates.js"></script><script src="model.js"></script><script src="v2-engine.js"></script><script src="app.js"></script><script src="v2-ui.js"></script><script src="4bc9e8e5425eca17b441537bf664e289.js"></script>
 </body>

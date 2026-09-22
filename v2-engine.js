@@ -304,7 +304,7 @@
 
    const network=m.name;assert(safeName(network)===network,'Use a network name without filename-reserved characters or trailing dots/spaces.');const errors=m.issues().filter(i=>i.level==='error');assert(!errors.length,`${network}: ${errors.map(e=>e.message).join(' ')}`);
 
-   const filename=safeName(network),decorators=m.nodes.filter(n=>/XMLDecorator/i.test(n.getAttribute('typename')));let queries=null;
+   const filename=safeName(String(item.filename||`${network}.mhn`).replace(/\.mhn$/i,'')),decorators=m.nodes.filter(n=>/XMLDecorator/i.test(n.getAttribute('typename')));let queries=null;
 
    if(cqms&&decorators.length){const output=generateCQMS(network,rows,templates.cqms);queries=output.queries;add(`CQMS/${filename}.xml`,output.xml);}
 

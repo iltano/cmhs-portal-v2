@@ -12,7 +12,7 @@
   let networks=data.networks.map(n=>({...n,originalXML:n.xml}));
   let activeId=null,model=null,history=new History(),selection=null,tab='networks',role='all',tool='select',pending=null;
   let pointerPosition=null;
-  let view={x:30,y:40,z:.75},drag=null,toastTimer,saveTimer,hubXML=data.hub.xml,customTemplates=[],persistOK=true;
+  let view={x:30,y:40,z:.75},drag=null,toastTimer,saveTimer,hubXML=data.hub.xml,hubFilename=data.hub.filename||'main.mhc',hubActive=false,removedHubKeys=new Set(),customTemplates=[],workspaceTemplates=[],persistOK=true;
   const drafts=new Map();
   const store={
     prefix:data.storageKey||'cmhs-studio-v2:public-lpg-v1:',
@@ -32,14 +32,40 @@
   }
   function saveDraft(){
     const n=networks.find(n=>n.id===activeId);if(!n)return;
-    n.xml=model.toXML();n.name=model.name;n.description=model.description;n.nodeCount=model.nodes.length;n.connectionCount=model.edges.length;
-    drafts.set(activeId,{id:activeId,name:n.name,filename:model.filename,xml:n.xml,imported:!!n.imported});
+    n.xml=model.toXML();n.name=model.name;n.filename=model.filename;n.description=model.description;n.nodeCount=model.nodes.length;n.connectionCount=model.edges.length;
+    drafts.set(activeId,{id:activeId,name:n.name,filename:model.filename,xml:n.xml,imported:!!n.imported,hubManaged:!!n.hubManaged,hubKey:n.hubKey||null});
     $('save-status').textContent='Saving draft…';clearTimeout(saveTimer);
     saveTimer=setTimeout(flushDrafts,250);
   }
   function flushDrafts(){
     clearTimeout(saveTimer);persistOK=store.put('drafts',[...drafts.values()]);
     $('save-status').textContent=persistOK?'● Draft saved in this browser':'Draft not saved — export to keep changes';
+  }
+  const registrationKey=(filename,name)=>`${String(filename||'').toLowerCase()}\u0000${String(name||'')}`;
+  function persistHubState(){return store.put('hub-state',{xml:hubXML,filename:hubFilename,active:hubActive,removed:[...removedHubKeys]});}
+  function managedNetworks(){return networks.filter(network=>network.hubManaged);}
+  function synchronizeHub(){
+    const doc=parseXML(hubXML);if(doc.documentElement.tagName!=='messagehub')throw new Error('The hub configuration root must be messagehub.');
+    let list=child(doc.documentElement,'networks');
+    if(!list){list=doc.createElement('networks');doc.documentElement.append(list);}
+    const managed=managedNetworks(),keys=new Set([...removedHubKeys,...managed.map(network=>network.hubKey).filter(Boolean)]);
+    children(list,'network').filter(entry=>keys.has(registrationKey(entry.getAttribute('filename'),entry.getAttribute('name')))).forEach(entry=>entry.remove());
+    managed.forEach(network=>{const entry=doc.createElement('network');entry.setAttribute('filename',network.filename);entry.setAttribute('name',network.name);list.append(entry);network.hubKey=registrationKey(network.filename,network.name);const draft=drafts.get(network.id);if(draft)draft.hubKey=network.hubKey;});
+    removedHubKeys.clear();hubXML=CMHS.serializeDocument(doc);persistHubState();return hubXML;
+  }
+  function configurationDocuments(){return hubActive&&networks.find(network=>network.id===activeId)?.hubManaged?managedNetworks().map(network=>({id:network.id,filename:network.filename,xml:network.id===activeId?model.toXML():network.xml})):null;}
+  function configurationExport(){if(!configurationDocuments())return null;return {filename:hubFilename,xml:synchronizeHub()};}
+  function uniqueNetworkName(value,exceptId=null){
+    const base=String(value||'NewNetwork').trim()||'NewNetwork';let name=base,index=2;
+    while(networks.some(network=>network.id!==exceptId&&network.name===name))name=`${base}_${index++}`;
+    return name;
+  }
+  function addNetwork(xml,filename,options={}){
+    const document=new NetworkDocument(xml,filename),requested=options.name||document.name,name=uniqueNetworkName(requested);
+    const renamed=name!==document.name;if(renamed)document.renameNetwork(name);
+    document.filename=renamed?`${name}.mhn`:filename;
+    const id=options.id||`import:${Date.now()}:${filename}:${networks.length}`,network={id,filename:document.filename,name:document.name,xml:document.toXML(),description:document.description,nodeCount:document.nodes.length,connectionCount:document.edges.length,imported:true,hubManaged:!!options.hubManaged,hubKey:options.hubKey||null};
+    networks.push(network);drafts.set(id,{...network});return network;
   }
   function openNetwork(id){
     const network=networks.find(n=>n.id===id);if(!network)return;
@@ -56,6 +82,7 @@
     $('undo-btn').disabled=!history.past.length;$('redo-btn').disabled=!history.future.length;
     const errors=model.issues().filter(i=>i.level==='error');
     $('issues-btn').classList.toggle('has-errors',errors.length>0);$('issues-btn').textContent=errors.length?`! ${errors.length} issue${errors.length===1?'':'s'}`:'✓ Check network';
+    $('export-configuration-btn').disabled=!configurationDocuments();
     window.CMHS_V2?.updateToolbar();
     if(!drafts.has(activeId))$('save-status').textContent='Original file · edits create a local draft';
     else $('save-status').textContent=persistOK?'● Draft saved in this browser':'Export to keep changes';
@@ -66,20 +93,26 @@
     const list=$('catalog-list');list.replaceChildren();const q=$('catalog-search').value.toLowerCase().trim();
     if(tab==='networks'){
       const filtered=networks.filter(n=>(n.name+' '+n.description).toLowerCase().includes(q));
+      const addItem=(n,configuration=false)=>{const b=button('',()=>openNetwork(n.id),'network-item'+(n.id===activeId?' active':'')+(configuration?' configuration-network':''));b.title=n.name+'\n'+n.description;b.oncontextmenu=event=>{event.preventDefault();networkContextMenu(event,n.id);};const row=el('div','item-row');row.append(el('span','network-icon','⌘'),el('strong','',n.name.replace(/^\d+_/,'')));if(configuration)row.append(el('span','configuration-badge','CONFIG'));if(drafts.has(n.id))row.append(el('span','draft-dot'));b.append(row,el('small','',configuration?`${hubFilename} · ${n.nodeCount} elements`:`${n.name.match(/^\d+/)?.[0]||'CMHS'} · ${n.nodeCount} elements`));list.append(b);};
+      const configurationNetworks=filtered.filter(n=>n.hubManaged);
+      if(configurationNetworks.length){list.append(el('div','catalog-group',`Open configuration · ${hubFilename}`));configurationNetworks.forEach(n=>addItem(n,true));}
       const groups=[['Imports',n=>/^91/.test(n.name)],['Exports',n=>/^92/.test(n.name)],['Actions & services',n=>!/^9[12]/.test(n.name)]];
       groups.forEach(([title,test])=>{
-        const items=filtered.filter(test);if(!items.length)return;list.append(el('div','catalog-group',title));
-        items.forEach(n=>{const b=button('',()=>openNetwork(n.id),'network-item'+(n.id===activeId?' active':''));b.title=n.name+'\n'+n.description;const row=el('div','item-row');row.append(el('span','network-icon','⌘'),el('strong','',n.name.replace(/^\d+_/,'')));if(drafts.has(n.id))row.append(el('span','draft-dot'));b.append(row,el('small','',`${n.name.match(/^\d+/)?.[0]||'CMHS'} · ${n.nodeCount} elements`));list.append(b);});
+        const items=filtered.filter(n=>!n.hubManaged&&test(n));if(!items.length)return;list.append(el('div','catalog-group',title));
+        items.forEach(n=>addItem(n));
       });
-      if(!filtered.length)list.append(el('p','empty-result','No matching networks. Import a .mhn file or create a new network.'));
+      if(!filtered.length)list.append(el('p','empty-result','No matching networks. Import .mhn files, import a configuration, or create a new network.'));
     }else{
       const defs=data.definitions.filter(d=>(role==='all'||d.role===role)&&(d.typename+' '+d.module+' '+Object.keys(d.parameters).join(' ')).toLowerCase().includes(q));
       list.append(el('div','catalog-group','From your CMHS files'));
       defs.forEach(d=>{const b=button('',()=>showDefinition(d),'library-card');b.draggable=true;b.title='Drag to canvas to use the first example, or click to choose an example.';b.ondragstart=e=>{e.dataTransfer.setData('application/x-cmhs-template',JSON.stringify(data.instances.find(i=>i.id===d.instanceIds[0])));e.dataTransfer.effectAllowed='copy';};b.append(el('span','role-pill '+d.role,d.role),el('strong','',d.typename),el('small','',`${d.instanceIds.length} examples · ${Object.keys(d.parameters).length} settings`));list.append(b);});
       const saved=customTemplates.filter(t=>(role==='all'||t.role===role)&&(t.name+' '+t.typename).toLowerCase().includes(q));
+      const workspace=workspaceTemplates.filter(t=>(role==='all'||t.role===role)&&(t.name+' '+t.typename+' '+t.network).toLowerCase().includes(q));
+      if(workspace.length)list.append(el('div','catalog-group','Workspace network library'));
+      workspace.forEach(t=>{const b=button('',()=>addTemplate(t),'library-card');b.draggable=true;b.ondragstart=e=>{e.dataTransfer.setData('application/x-cmhs-template',JSON.stringify(t));e.dataTransfer.effectAllowed='copy';};b.append(el('span','role-pill '+t.role,t.role),el('strong','',t.name),el('small','',`${t.network} · ${t.typename}`));list.append(b);});
       if(saved.length)list.append(el('div','catalog-group','My templates'));
       saved.forEach(t=>{const b=button('',()=>addTemplate(t),'library-card');b.draggable=true;b.ondragstart=e=>{e.dataTransfer.setData('application/x-cmhs-template',JSON.stringify(t));e.dataTransfer.effectAllowed='copy';};b.append(el('span','role-pill '+t.role,t.role),el('strong','',t.name),el('small','','Saved template · '+t.typename));list.append(b);});
-      if(!defs.length&&!saved.length)list.append(el('p','empty-result','No matching element types.'));
+      if(!defs.length&&!saved.length&&!workspace.length)list.append(el('p','empty-result','No matching element types.'));
     }
   }
   function worldPos(n){const p=model.position(n);return{x:p.x*SX+40,y:p.y*SY+40};}
@@ -216,6 +249,9 @@
     perform(()=>{const name=model.add(template.xml,(x-40)/SX,(y-40)/SY,templateNetwork(template));selection={kind:'node',name};});toast('Element configuration added. Review its parameters before exporting.');
   }
   function saveTemplate(name){const n=model.node(name);const t={id:'custom-'+Date.now(),network:model.name,name,role:n.tagName,typename:n.getAttribute('typename'),xml:serialize(n)};customTemplates.push(t);const saved=store.put('templates',customTemplates);renderCatalog();toast(saved?'Saved to My templates in the library.':'Template is available this session; browser storage is unavailable.',!saved);}
+  function refreshWorkspaceLibrary(){
+    workspaceTemplates=[];const seen=new Set();networks.forEach(network=>{try{const doc=new NetworkDocument(network.id===activeId?model.toXML():network.xml,network.filename);doc.nodes.forEach(node=>{const xml=serialize(node),key=`${node.tagName}\u0000${node.getAttribute('typename')}\u0000${xml}`;if(seen.has(key))return;seen.add(key);workspaceTemplates.push({id:`workspace:${workspaceTemplates.length}`,network:doc.name,name:node.getAttribute('name'),role:node.tagName,typename:node.getAttribute('typename'),xml});});}catch{/* Invalid imports are never added to the reusable library. */}});store.put('workspace-templates',workspaceTemplates);renderCatalog();toast(`Updated workspace library with ${workspaceTemplates.length} element configuration${workspaceTemplates.length===1?'':'s'}.`);
+  }
   function modal(title,body,actions=[],eyebrow='WORKSPACE'){
     if($('modal').open)$('modal').close();$('modal-title').textContent=title;$('modal-eyebrow').textContent=eyebrow;$('modal-body').replaceChildren(body);$('modal-footer').replaceChildren(button('Cancel',()=>$('modal').close()));actions.forEach(a=>$('modal-footer').append(button(a.text,()=>{try{a.run();}catch(e){toast(e.message,true);}},a.primary?'primary':'')));$('modal').showModal();
   }
@@ -228,28 +264,57 @@
     modal('New connection',body,[{text:'Connect',primary:true,run:()=>{if(model.edges.some(e=>e.getAttribute('producer')===from&&e.getAttribute('consumer')===to))throw new Error('This connection already exists.');perform(()=>{selection={kind:'edge',index:model.connect(from,to)};});$('modal').close();}}]);
   }
   function settingsDialog(){
-    const body=el('div');let desc=model.description;const vars=el('textarea','code-editor mono');vars.value=serialize(child(model.setup,'variables')||model.doc.createElement('variables'));body.append(field('Description',desc,v=>desc=v,{multiline:true}),el('p','dialog-intro','NETWORKNAME controls the network title. Variables may have value attributes or nested conditionalValue elements; both are preserved.'),vars);
-    modal('Network settings',body,[{text:'Save settings',primary:true,run:()=>{const parsed=parseXML(vars.value);if(parsed.documentElement.tagName!=='variables')throw new Error('The XML root must be variables.');perform(()=>{model.setVariablesXML(vars.value);model.setDescription(desc);});$('modal').close();}}]);
+    const body=el('div');let name=model.name,desc=model.description;const vars=el('textarea','code-editor mono');vars.value=serialize(child(model.setup,'variables')||model.doc.createElement('variables'));body.append(field('Network name',name,v=>name=v,{help:'Renaming also renames every element and updates its connection references.'}),field('Description',desc,v=>desc=v,{multiline:true}),el('p','dialog-intro','NETWORKNAME controls the network title. Variables may have value attributes or nested conditionalValue elements; both are preserved.'),vars);
+    modal('Network settings',body,[{text:'Delete network',run:()=>deleteNetwork()},{text:'Duplicate network',run:()=>duplicateNetwork()},{text:'Save settings',primary:true,run:()=>{const parsed=parseXML(vars.value);if(parsed.documentElement.tagName!=='variables')throw new Error('The XML root must be variables.');const next=uniqueNetworkName(name,activeId);if(next!==name)throw new Error(`A network named “${name}” already exists.`);perform(()=>{model.setVariablesXML(vars.value);model.setDescription(desc);if(next!==model.name){model.renameNetwork(next);model.filename=next+'.mhn';}});if(hubActive)synchronizeHub();$('modal').close();}}]);
   }
-  function hubDialog(){const body=el('div'),input=el('textarea','code-editor mono');input.value=hubXML;body.append(el('p','dialog-intro','Global variables and network registrations from main.mhc. Export this separately if a new network filename needs registering. This does not change the original file.'),input);modal('Hub configuration',body,[{text:'Save local draft',run:()=>{if(parseXML(input.value).documentElement.tagName!=='messagehub')throw new Error('The root must be messagehub.');hubXML=input.value;const ok=store.put('hub',hubXML);$('modal').close();toast(ok?'Hub draft saved locally.':'Hub draft kept for this session. Export to keep it.',!ok);}},{text:'Export .mhc',primary:true,run:()=>{if(parseXML(input.value).documentElement.tagName!=='messagehub')throw new Error('The root must be messagehub.');hubXML=input.value;store.put('hub',hubXML);download(hubXML,'main.mhc','application/xml');}}]);}
-  function newNetwork(){let name='NewNetwork';const body=el('div');body.append(field('Network name',name,v=>name=v),el('p','dialog-intro','Start from an empty network, then choose a source from the library.'));modal('New network',body,[{text:'Create network',primary:true,run:()=>{if(!name.trim())throw new Error('Enter a network name.');const doc=NetworkDocument.empty(name),id='custom:'+Date.now()+'.mhn';networks.push({id,name,filename:name+'.mhn',xml:doc.toXML(),description:'',nodeCount:0,connectionCount:0,imported:true});$('modal').close();openNetwork(id);saveDraft();setTab('library');}}]);}
+  function hubDialog(){const body=el('div'),input=el('textarea','code-editor mono');input.value=hubXML;body.append(el('p','dialog-intro',hubActive?'This open configuration is kept synchronized with its loaded networks. Exporting the configuration includes the .mhc and every registered .mhn file.':'Global variables and network registrations from main.mhc. Import a configuration folder to load its linked networks together.'),input);modal('Hub configuration',body,[{text:'Save local draft',run:()=>{if(parseXML(input.value).documentElement.tagName!=='messagehub')throw new Error('The root must be messagehub.');hubXML=input.value;const ok=persistHubState();$('modal').close();toast(ok?'Hub draft saved locally.':'Hub draft kept for this session.',!ok);}},{text:'Export .mhc',primary:true,run:()=>{if(parseXML(input.value).documentElement.tagName!=='messagehub')throw new Error('The root must be messagehub.');hubXML=input.value;download(hubActive?synchronizeHub():hubXML,hubFilename,'application/xml');}}]);}
+  function newNetwork(){let name='NewNetwork';const body=el('div');body.append(field('Network name',name,v=>name=v),el('p','dialog-intro',hubActive?'The new network will be added to the open configuration.':'Start from an empty network, then choose a source from the library.'));modal('New network',body,[{text:'Create network',primary:true,run:()=>{if(!name.trim())throw new Error('Enter a network name.');const next=uniqueNetworkName(name);if(next!==name)throw new Error(`A network named “${name}” already exists.`);const doc=NetworkDocument.empty(name),id='custom:'+Date.now()+'.mhn',network={id,name,filename:name+'.mhn',xml:doc.toXML(),description:'',nodeCount:0,connectionCount:0,imported:true,hubManaged:hubActive,hubKey:null};networks.push(network);if(hubActive)synchronizeHub();$('modal').close();openNetwork(id);saveDraft();setTab('library');}}]);}
+  function duplicateNetwork(){
+    const original=networks.find(network=>network.id===activeId),base=`${model.name}_Copy`,name=uniqueNetworkName(base),copy=new NetworkDocument(model.toXML(),model.filename);
+    copy.renameNetwork(name);copy.filename=name+'.mhn';const id=`copy:${Date.now()}.mhn`,network={id,name,filename:copy.filename,xml:copy.toXML(),description:copy.description,nodeCount:copy.nodes.length,connectionCount:copy.edges.length,imported:true,hubManaged:!!original?.hubManaged,hubKey:null};
+    networks.push(network);drafts.set(id,{...network});if(network.hubManaged)synchronizeHub();$('modal').close();openNetwork(id);flushDrafts();toast(`Duplicated ${original?.name||'network'} as ${name}.`);
+  }
+  function deleteNetwork(){
+    const index=networks.findIndex(network=>network.id===activeId);if(index<0)return;const network=networks[index];
+    if(network.hubManaged&&network.hubKey)removedHubKeys.add(network.hubKey);networks.splice(index,1);drafts.delete(network.id);store.put('drafts',[...drafts.values()]);if(hubActive)synchronizeHub();$('modal').close();const next=networks[index]||networks[index-1];if(next)openNetwork(next.id);else{activeId=null;model=null;renderCatalog();}toast(`Deleted ${network.name} from this local workspace.`);
+  }
+  let networkMenu=null,networkMenuTarget=null;
+  function hideNetworkMenu(){if(networkMenu){networkMenu.remove();networkMenu=null;}networkMenuTarget=null;}
+  function renameNetworkDialog(id){
+    openNetwork(id);let name=model.name;const body=el('div');body.append(field('Network name',name,value=>name=value,{help:'Renaming also renames every element and updates its connection references.'}));
+    modal('Rename network',body,[{text:'Rename network',primary:true,run:()=>{const next=uniqueNetworkName(name,activeId);if(next!==name)throw new Error(`A network named “${name}” already exists.`);if(next!==model.name){perform(()=>{model.renameNetwork(next);model.filename=next+'.mhn';});if(hubActive)synchronizeHub();}$('modal').close();}}]);
+  }
+  function networkContextMenu(event,id){
+    hideNetworkMenu();networkMenuTarget=id;const network=networks.find(item=>item.id===id);if(!network)return;
+    networkMenu=el('div','node-context-menu network-context-menu');networkMenu.setAttribute('role','menu');networkMenu.setAttribute('aria-label',`Network actions for ${network.name}`);
+    [['Open',()=>openNetwork(id)],['Rename',()=>renameNetworkDialog(id)],['Duplicate',()=>{openNetwork(id);duplicateNetwork();}],['Delete',()=>{openNetwork(id);deleteNetwork();}]].forEach(([label,action])=>{const item=button(label,()=>{hideNetworkMenu();action();});item.setAttribute('role','menuitem');networkMenu.append(item);});
+    document.body.append(networkMenu);const rect=networkMenu.getBoundingClientRect();networkMenu.style.left=Math.max(8,Math.min(event.clientX,innerWidth-rect.width-8))+'px';networkMenu.style.top=Math.max(8,Math.min(event.clientY,innerHeight-rect.height-8))+'px';networkMenu.querySelector('button').focus();
+  }
+  document.addEventListener('pointerdown',event=>{if(networkMenu&&!networkMenu.contains(event.target))hideNetworkMenu();},true);window.addEventListener('resize',hideNetworkMenu);window.addEventListener('blur',hideNetworkMenu);
   function issuesDialog(){const issues=model.issues(),body=el('div');body.append(el('p','dialog-intro','Checks XML structure, unique element names, connection endpoints and direction. CMHS modules, paths, queries and business behavior must be tested in your target environment.'));if(!issues.length)body.append(el('div','issue ok','✓ Network structure is valid. All connections have valid endpoints.'));issues.forEach(i=>body.append(el('div','issue '+i.level,i.message)));modal('Network checks',body,[{text:'Done',primary:true,run:()=>$('modal').close()}]);}
-  function exportNetwork(){
-    if(window.CMHS_V2){window.CMHS_V2.saveDialog(false);return;}
+  function exportUpdatedNetworks(){
+    if(window.CMHS_V2){window.CMHS_V2.saveDialog('updated');return;}
     const errors=model.issues().filter(i=>i.level==='error');if(errors.length){issuesDialog();toast('Resolve the structural errors before exporting.',true);return;}
     const name=model.name.replace(/[<>:"/\\|?*\x00-\x1f]/g,'_')||'network';download(model.toXML(),name+'.mhn','application/xml');flushDrafts();toast('Downloaded a modified network. The original file is unchanged.');
+  }
+  function exportConfiguration(){
+    if(!configurationDocuments()){toast('Open a network from an imported configuration to export that configuration.',true);return;}
+    window.CMHS_V2?.saveDialog('configuration');
   }
   function download(text,name,type){const url=URL.createObjectURL(new Blob([text],{type})),a=el('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);}
   function deleteSelection(){if(selection?.kind==='nodes')perform(()=>{selection.names.forEach(n=>model.remove(n));selection=null;});else if(selection?.kind==='node')perform(()=>{model.remove(selection.name);selection=null;});else if(selection?.kind==='edge')perform(()=>{model.edges[selection.index].remove();selection=null;});}
   function undo(redo=false){if(!model)return;const xml=redo?history.redo(model.toXML()):history.undo(model.toXML());if(!xml)return;model=new NetworkDocument(xml,model.filename);selection=null;pending=null;saveDraft();renderAll();}
   async function importFiles(files){
-    let count=0,last=null;for(const file of files){if(!/\.(mhn|mhc|xml)$/i.test(file.name))continue;try{
-      const xml=await file.text(),doc=parseXML(xml);
-      if(doc.documentElement.tagName==='messagehub'){hubXML=xml;store.put('hub',hubXML);toast('Hub configuration imported. Open Hub configuration to edit it.');continue;}
-      const imported=new NetworkDocument(xml,file.name),id='import:'+Date.now()+':'+file.name+':'+count;
-      networks.push({id,filename:file.name,name:imported.name,xml:imported.toXML(),description:imported.description,nodeCount:imported.nodes.length,connectionCount:imported.edges.length,imported:true});drafts.set(id,{id,filename:file.name,name:imported.name,xml:imported.toXML(),imported:true});count++;last=id;
-    }catch(e){toast(`${file.name}: ${e.message}`,true);}}
-    if(last){openNetwork(last);flushDrafts();setTab('networks');toast(`Imported ${count} network${count===1?'':'s'} as local drafts.`);}
+    const parsed=[];for(const file of files){if(!/\.(mhn|mhc|xml)$/i.test(file.name))continue;try{const xml=await file.text(),doc=parseXML(xml);parsed.push({file,xml,doc});}catch(e){toast(`${file.name}: ${e.message}`,true);}}
+    const hub=parsed.find(entry=>entry.doc.documentElement.tagName==='messagehub');let count=0,last=null,linked=new Set();
+    if(hub){
+      hubXML=hub.xml;hubFilename=hub.file.name;hubActive=true;removedHubKeys.clear();const registrations=children(child(hub.doc.documentElement,'networks'),'network');
+      registrations.forEach(registration=>{const filename=registration.getAttribute('filename')||'',match=parsed.find(entry=>entry!==hub&&entry.doc.documentElement.tagName==='messagehubnetwork'&&entry.file.name.toLowerCase()===filename.toLowerCase());if(!match)return;try{const network=addNetwork(match.xml,match.file.name,{hubManaged:true,hubKey:registrationKey(filename,registration.getAttribute('name'))});count++;last=network.id;linked.add(match);}catch(error){toast(`${match.file.name}: ${error.message}`,true);}});
+      synchronizeHub();const missing=registrations.length-count;if(missing)toast(`${missing} linked network${missing===1?' was':'s were'} not selected. Choose the configuration folder or select the .mhc and all registered .mhn files together.`,true);
+    }
+    parsed.filter(entry=>entry!==hub&&!linked.has(entry)&&entry.doc.documentElement.tagName==='messagehubnetwork').forEach(entry=>{try{const network=addNetwork(entry.xml,entry.file.name);count++;last=network.id;}catch(error){toast(`${entry.file.name}: ${error.message}`,true);}});
+    if(last){openNetwork(last);flushDrafts();setTab('networks');toast(hub?`Opened configuration with ${count} linked network${count===1?'':'s'}.`:`Imported ${count} network${count===1?'':'s'} as local drafts.`);}
+    else if(hub){persistHubState();toast('Configuration imported. Select its folder or its registered .mhn files to load the linked networks.',true);}
   }
   function help(){const body=el('div','guide-grid');[
     ['1 · Choose a network','Open any of the bundled networks or import .mhn files. Your original XML stays untouched. Local drafts survive reloads when browser storage is available.'],
@@ -265,9 +330,10 @@
   $('networks-tab').onclick=()=>setTab('networks');$('library-tab').onclick=()=>setTab('library');$('catalog-search').oninput=renderCatalog;
   document.querySelectorAll('[data-role]').forEach(b=>b.onclick=()=>{role=b.dataset.role;document.querySelectorAll('[data-role]').forEach(x=>x.classList.toggle('active',x===b));renderCatalog();});
   $('select-tool').onclick=()=>setTool('select');$('connect-tool').onclick=()=>setTool('connect');$('fit-btn').onclick=fit;$('undo-btn').onclick=()=>undo();$('redo-btn').onclick=()=>undo(true);
-  $('zoom-in').onclick=()=>zoom(1.2);$('zoom-out').onclick=()=>zoom(1/1.2);$('zoom-value').onclick=()=>zoom(1/view.z);
-  $('new-btn').onclick=newNetwork;$('network-settings-btn').onclick=settingsDialog;$('hub-btn').onclick=hubDialog;$('help-btn').onclick=help;$('export-btn').onclick=exportNetwork;$('issues-btn').onclick=issuesDialog;$('empty-library-btn').onclick=()=>setTab('library');
-  $('import-btn').onclick=()=>$('file-input').click();$('file-input').onchange=async e=>{await importFiles([...e.target.files]);e.target.value='';};
+  ['zoom-in','zoom-out','zoom-value'].forEach(id=>$(id).addEventListener('pointerdown',event=>event.stopPropagation()));
+  $('zoom-in').onclick=event=>{event.preventDefault();zoom(1.2);};$('zoom-out').onclick=event=>{event.preventDefault();zoom(1/1.2);};$('zoom-value').onclick=event=>{event.preventDefault();zoom(1/view.z);};
+  $('new-btn').onclick=newNetwork;$('refresh-library-btn').onclick=refreshWorkspaceLibrary;$('network-settings-btn').onclick=settingsDialog;$('hub-btn').onclick=hubDialog;$('help-btn').onclick=help;$('export-networks-btn').onclick=exportUpdatedNetworks;$('export-configuration-btn').onclick=exportConfiguration;$('issues-btn').onclick=issuesDialog;$('empty-library-btn').onclick=()=>setTab('library');
+  $('import-btn').onclick=()=>$('file-input').click();$('configuration-import-btn').onclick=()=>$('configuration-input').click();$('file-input').onchange=async e=>{await importFiles([...e.target.files]);e.target.value='';};$('configuration-input').onchange=async e=>{await importFiles([...e.target.files]);e.target.value='';};
   $('canvas').addEventListener('wheel',e=>{e.preventDefault();const r=$('canvas').getBoundingClientRect();zoom(Math.exp(-e.deltaY*.0015),{x:e.clientX-r.left,y:e.clientY-r.top});},{passive:false});
   $('canvas').addEventListener('pointerdown',e=>{if(e.button!==0&&e.button!==1)return;selection=null;drag={kind:'pan',startX:e.clientX,startY:e.clientY,x:view.x,y:view.y};$('canvas').setPointerCapture(e.pointerId);renderGraph();renderInspector();});
   $('canvas').addEventListener('pointermove',e=>{
@@ -290,16 +356,16 @@
   let dragDepth=0;window.addEventListener('dragenter',e=>{if(e.dataTransfer?.types.includes('Files')){e.preventDefault();dragDepth++;document.body.classList.add('drop-overlay');}});window.addEventListener('dragover',e=>{if(e.dataTransfer?.types.includes('Files'))e.preventDefault();});window.addEventListener('dragleave',()=>{if(--dragDepth<=0)document.body.classList.remove('drop-overlay');});window.addEventListener('drop',e=>{e.preventDefault();dragDepth=0;document.body.classList.remove('drop-overlay');importFiles([...e.dataTransfer.files]);});
   window.addEventListener('beforeunload',()=>{if(saveTimer)flushDrafts();});
   $('modal').addEventListener('click',e=>{if(e.target===$('modal'))$('modal').close();});
-  customTemplates=store.get('templates',[]);hubXML=store.get('hub',data.hub.xml);
-  store.get('drafts',[]).forEach(d=>{try{new NetworkDocument(d.xml,d.filename||d.id);const found=networks.find(n=>n.id===d.id);if(found){Object.assign(found,{xml:d.xml,name:d.name});const m=new NetworkDocument(d.xml,d.filename||d.id);found.description=m.description;found.nodeCount=m.nodes.length;found.connectionCount=m.edges.length;}else networks.push({...d,description:'Imported or new network',nodeCount:new NetworkDocument(d.xml,d.filename).nodes.length,connectionCount:new NetworkDocument(d.xml,d.filename).edges.length});drafts.set(d.id,d);}catch{/* Leave an unusable stored draft out of the active workspace. */}});
+  customTemplates=store.get('templates',[]);workspaceTemplates=store.get('workspace-templates',[]);const hubState=store.get('hub-state',null);if(hubState?.xml){hubXML=hubState.xml;hubFilename=hubState.filename||'main.mhc';hubActive=!!hubState.active;removedHubKeys=new Set(hubState.removed||[]);}else hubXML=store.get('hub',data.hub.xml);
+  store.get('drafts',[]).forEach(d=>{try{new NetworkDocument(d.xml,d.filename||d.id);const found=networks.find(n=>n.id===d.id);if(found){Object.assign(found,{xml:d.xml,name:d.name,filename:d.filename,hubManaged:!!d.hubManaged,hubKey:d.hubKey||null});const m=new NetworkDocument(d.xml,d.filename||d.id);found.description=m.description;found.nodeCount=m.nodes.length;found.connectionCount=m.edges.length;}else networks.push({...d,description:'Imported or new network',nodeCount:new NetworkDocument(d.xml,d.filename).nodes.length,connectionCount:new NetworkDocument(d.xml,d.filename).edges.length,hubManaged:!!d.hubManaged,hubKey:d.hubKey||null});drafts.set(d.id,d);}catch{/* Leave an unusable stored draft out of the active workspace. */}});
   const active=store.get('active',null);openNetwork(networks.some(n=>n.id===active)?active:(data.defaultNetwork||networks[0]?.id));
   function selectedNames(){return selection?.kind==='node'?[selection.name]:selection?.kind==='nodes'?selection.names:[];}
   function setSelectedNames(names){selection=names.length>1?{kind:'nodes',names}:names.length?{kind:'node',name:names[0]}:null;renderGraph();renderInspector();window.CMHS_V2?.updateToolbar();}
   function commitNetworks(updates){
     updates.forEach(item=>{if(!networks.some(n=>n.id===item.id))throw new Error('Network not found: '+item.id);});
     const parsed=updates.map(item=>({...item,parsed:new NetworkDocument(item.xml,networks.find(n=>n.id===item.id)?.filename||item.id)}));
-    parsed.forEach(item=>{const n=networks.find(n=>n.id===item.id),doc=item.parsed;if(n.id===activeId){history.record(model.toXML());model=doc;selection=null;pending=null;}Object.assign(n,{xml:doc.toXML(),name:doc.name,description:doc.description,nodeCount:doc.nodes.length,connectionCount:doc.edges.length});drafts.set(n.id,{id:n.id,name:n.name,filename:doc.filename,xml:n.xml,imported:!!n.imported});});
+    parsed.forEach(item=>{const n=networks.find(n=>n.id===item.id),doc=item.parsed;if(n.id===activeId){history.record(model.toXML());model=doc;selection=null;pending=null;}Object.assign(n,{xml:doc.toXML(),name:doc.name,filename:doc.filename,description:doc.description,nodeCount:doc.nodes.length,connectionCount:doc.edges.length});drafts.set(n.id,{id:n.id,name:n.name,filename:doc.filename,xml:n.xml,imported:!!n.imported,hubManaged:!!n.hubManaged,hubKey:n.hubKey||null});});
     flushDrafts();renderAll();
   }
-  window.CMHS_STUDIO={get model(){return model;},get selection(){return selection;},get catalog(){return data;},openNetwork,importFiles,perform,renderAll,fit,toast,modal,field,section,panelHeader,button,el,store,saveDraft,flushDrafts,deleteSelection,selectedNames,setSelectedNames,commitNetworks,templateNetwork,get activeId(){return activeId;},get networks(){return networks;},get drafts(){return drafts;},canvasPosition(clientX,clientY){const r=$('canvas').getBoundingClientRect();return{x:((clientX-r.left-view.x)/view.z-40)/SX,y:((clientY-r.top-view.y)/view.z-40)/SY};},centerPosition(){const r=$('canvas').getBoundingClientRect();return this.canvasPosition(r.left+r.width/2,r.top+r.height/2);}};
+  window.CMHS_STUDIO={get model(){return model;},get selection(){return selection;},get catalog(){return data;},openNetwork,importFiles,perform,renderAll,fit,toast,modal,field,section,panelHeader,button,el,store,saveDraft,flushDrafts,deleteSelection,selectedNames,setSelectedNames,commitNetworks,templateNetwork,refreshWorkspaceLibrary,get activeId(){return activeId;},get networks(){return networks;},get drafts(){return drafts;},configurationDocuments,configurationExport,canvasPosition(clientX,clientY){const r=$('canvas').getBoundingClientRect();return{x:Math.max(CMHS.MIN_X,((clientX-r.left-view.x)/view.z-40)/SX),y:Math.max(CMHS.MIN_Y,((clientY-r.top-view.y)/view.z-40)/SY)};},centerPosition(){const r=$('canvas').getBoundingClientRect();return this.canvasPosition(r.left+r.width/2,r.top+r.height/2);}};
 })();
