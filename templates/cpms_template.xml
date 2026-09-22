@@ -1,17 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
     <comment />
-    <servers>
-        <server name="%CPMS_APP_SERVER%" />
-    </servers>
-    <categories>
-        <category name="CMHS" />
-    </categories>
+	<variables>
+		<variable name="CPMS_APP_SERVER" value=""/>
+	</variables>
+	<servers>
+		<server name="%CPMS_APP_SERVER%"/>
+		<server name=""/>
+	</servers>
+	<server-roles>
+		<server-role name="application"/>
+	</server-roles>
+	<categories>
+		<category name="CMHS"/>
+	</categories>
     <windowsCredentials />
     <processConfigsWithoutKind />
     <processConfigs>
-        <processConfig autoStart="True" category="unknown" code="cmhs_networkname" enabled="True"
-            name="CMHS - networkname" processKindCode="{E0505CB6-92FF-437C-A52F-6DD09C4AD12B}"
+        <processConfig autoStart="True" category="CMHS" code="cmhs_networkname" enabled="True"
+            name="CMHS_networkname" processKindCode="{E0505CB6-92FF-437C-A52F-6DD09C4AD12B}"
             server="%CPMS_APP_SERVER%" server-role="none" system="False">
             <parameters>
                 <cmhs-configuration>
@@ -20,7 +27,7 @@
                 </cmhs-configuration>
                 <action-on-error action="stop all networks" />
             </parameters>
-            <comment>Process was created from CMHS Studio 2</comment>
+            <comment>StevenS:Process was created from CMHS Studio 2</comment>
         </processConfig>
     </processConfigs>
 </configuration>
