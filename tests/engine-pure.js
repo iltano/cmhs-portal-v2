@@ -23,13 +23,11 @@
  graph.edges=[...links,edge('other','output'),edge('other','other')];assert(issues().some(i=>i.message.includes('more than one'))&&issues().some(i=>i.message.includes('Self-connection')),'Imported illegal links rejected');
  graph.edges=links;graph.setup.children=[source,node('source2','producer')];assert(issues().some(i=>i.message.includes('exactly one')),'Multiple producers rejected');graph.setup.children=[];assert(issues().some(i=>i.message.includes('exactly one')),'Missing producer rejected');
  const naming=(name,type='FileWriter',network='Destination',origin='Source')=>CMHS.additionName(name,type,network,origin);
- assert(naming('XMLFileWriter1_Source_2')==='XMLFileWriter1_Destination_2','Copied filewriter uses destination network');
- assert(naming('XMLFileWriter1_Source')==='XMLFileWriter1_Destination_1','Legacy network name receives a counter');
- assert(naming('XMLFileWriter1_2')==='XMLFileWriter1_Destination_2','Counter is retained when network inserted');
- assert(naming('XMLFileWriter1')==='XMLFileWriter1_Destination_1','New writer includes network and counter');
- assert(naming('Process_Source_4','XSLProcessor')==='Process_Destination_4','Other copied element names rebase too');
- assert(naming('DATA_1','XSLProcessor','B','A')==='DATA_1','Network replacement respects name boundaries');
- assert(naming('XMLFileWriter1_Net_1_2','FileWriter','New_2','Net_1')==='XMLFileWriter1_New_2_2','Network names containing counters remain intact');
+ assert(naming('XMLFileWriter1_Source_2','XMLFileWriter')==='XMLFileWriter_1','Copied XML filewriters use type plus serial');
+ assert(naming('XMLFileWriter1_Source','XMLFileWriter')==='XMLFileWriter_1','Legacy names are removed from copied XML filewriters');
+ assert(naming('Process_Source_4','XSLProcessor')==='XSL_1','Copied XSL processors use type plus serial');
+ assert(naming('DATA_1','XSLProcessor','B','A')==='XSL_1','Network names do not affect copied element names');
+ assert(naming('DBLog_Source','CMHSDBLogWriterConsumer')==='CMHSDBLogWriter_1','Copied consumers use type plus serial');
  const unique=(base,used)=>CMHS.NetworkDocument.prototype.uniqueName.call({node:n=>used.includes(n)},base);
  assert(unique('Writer_2',['Writer_2','Writer_3'])==='Writer_4','Rightmost counter increments across collisions');
  assert(unique('Writer',['Writer','Writer_1'])==='Writer_2','Counter appended when absent');

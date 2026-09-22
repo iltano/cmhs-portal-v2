@@ -23,20 +23,7 @@
     if (typeof name !== 'string' || !name.trim()) throw new Error('An element name cannot be empty.');
   }
   function additionName(name, typename, network, sourceNetwork = '') {
-    let base = String(name || typename || 'Element').trim();
-    // Names contain literal network names; settings continue to use %NETWORKNAME%.
-    if (sourceNetwork && sourceNetwork !== network) {
-      const escaped = sourceNetwork.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      base = base.replace(new RegExp('(^|_)' + escaped + '(?=_|$)', 'g'), (_, prefix) => prefix + network);
-    }
-    if (['FileWriter','XMLFileWriter'].includes(typename)) {
-      const networkSuffix = '_' + network;
-      if (base.endsWith(networkSuffix)) return base + '_1';
-      if (base.includes(networkSuffix + '_') && /^\d+$/.test(base.slice(base.lastIndexOf(networkSuffix + '_') + networkSuffix.length + 1))) return base;
-      const counter = base.match(/_(\d+)$/);
-      base = (counter ? base.slice(0, -counter[0].length) : base) + networkSuffix + '_' + (counter ? counter[1] : '1');
-    }
-    return base;
+    return `${elementName(typename)}_1`;
   }
   function coordinate(value, minimum) {
     if (!Number.isFinite(Number(value))) throw new Error('Coordinates must be finite numbers.');
@@ -136,7 +123,9 @@
       const node = this.doc.importNode(source, true);
       const previous = source.tagName === 'producer' ? children(this.setup, 'producer')[0] : null;
       if (previous) {
-        node.setAttribute('name', previous.getAttribute('name'));
+        const oldName=previous.getAttribute('name'),base=additionName(node.getAttribute('name'),node.getAttribute('typename'),this.name,sourceNetwork);let replacement=base,index=2;
+        while(this.node(replacement)&&replacement!==oldName)replacement=`${elementName(node.getAttribute('typename'))}_${index++}`;
+        node.setAttribute('name', replacement);this.edges.forEach(edge=>{if(edge.getAttribute('producer')===oldName)edge.setAttribute('producer',replacement);});
         node.setAttribute('x', previous.getAttribute('x') || '0'); node.setAttribute('y', previous.getAttribute('y') || '0');
         previous.replaceWith(node);
       } else {
