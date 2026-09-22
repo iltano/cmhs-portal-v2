@@ -1,148 +1,61 @@
 # CMHS Portal v2
 
-A lightweight, browser-based editor and visualization tool for ** MessageHub network configurations**.
+CMHS Portal is a browser-based workspace for viewing, editing, and exporting MessageHub networks. It helps consultants understand an integration visually, make controlled XML changes, and prepare files for review without running MessageHub.
 
-CMHS Portal v2 provides a visual way to inspect, understand, modify, and export MessageHub networks without requiring a local installation or a full MessageHub environment.
+Files are processed locally in the browser. Nothing is uploaded to the portal server.
 
-## Features
+## Start here
 
-* Visualize MessageHub networks as connected diagrams.
-* Inspect producers, processors, decorators, consumers, and other network elements.
-* Edit element configuration directly from the browser.
-* Add elements from the built-in component library.
-* Copy and reuse configured elements between networks.
-* Create new networks from existing examples or from scratch.
-* Open or unload a configuration folder containing an `.mhc` file and its linked `.mhn` networks.
-* Rename, duplicate, or remove networks while synchronizing their hub registrations.
-* Rearrange network diagrams automatically or manually.
-* Create and modify connections between elements.
-* Validate network structure before export.
-* Export modified `.mhn` network files.
-* Preserve unknown XML settings and metadata when editing existing networks.
-* Generate supporting XSL, CQMS query, and consolidated CPMS process configuration files where applicable.
-* Work with query mappings associated with individual networks and XML decorators.
-* Undo and redo network changes during the editing session.
+1. Open an included example, use **Import .mhn**, or choose **Import configuration** for a folder containing an `.mhc` file and its linked `.mhn` files.
+2. Select a network in the left panel and inspect its elements on the diagram.
+3. Select an element to edit its parameters, attributes, comment, position, or XML.
+4. Use **Check network** before exporting.
+5. Choose the export that matches the work completed.
 
-## Runs locally in your browser
+The portal always downloads a new file or ZIP. It never overwrites the source files on the computer.
 
-CMHS Portal is designed as a client-side application.
+## What you can do
 
-**Files you open are processed locally in your browser and are not uploaded to a server.**
+- View producers, processors, consumers, and their connections as a diagram.
+- Move elements, pan, zoom, arrange the graph, and align selected elements.
+- Add components by dragging them from the library.
+- Copy and paste configured parts of a network into another network.
+- Add file writers or database log writers.
+- Edit, duplicate, replace, rename, or delete elements and networks.
+- Create a new network and manage network variables.
+- Validate one producer, valid connection direction, no self-connections, one input source per element, and reachable outputs.
+- Undo and redo network edits.
 
-Drafts and workspace preferences may be stored using your browser's local storage so that work can survive a page refresh.
+New, copied, and renamed elements use a component type plus serial convention, for example `XSL_1`, `XSL_2`, and `XMLFileWriter_1`.
 
-This means that opening a MessageHub configuration in the editor does not send its contents to the website host.
+## Configurations
 
-## Getting started
+**Import configuration** opens the `.mhc` and only the `.mhn` files it registers. Imported configuration network names are preserved. Duplicate network names within one configuration are rejected.
 
-1. Open CMHS Portal in your browser.
-2. Select one of the included example networks or import your own MessageHub network.
-3. Select an element in the diagram to inspect its configuration.
-4. Add, remove, move, rename, or reconnect elements as required.
-5. Use the validation tools to check the resulting network.
-6. Export the modified network when finished.
+Use **Hub configuration** to review the configuration XML, move networks up or down in its registration sequence, or unload the configuration from the browser workspace. The lower-left **Unload configuration** action removes its linked networks from the local workspace.
 
-The exported file is a new copy; the original file on your computer is not modified.
+## Export choices
 
-## Full MessageHub configurations
+| Option | Result |
+| --- | --- |
+| **Export current** | The active `.mhn` network only. |
+| **Export updated networks** | Only networks changed after import or creation. |
+| **Export configuration** | A ZIP containing the `.mhc` and all linked `.mhn` files together, plus selected generated files. |
 
-Use **Import configuration** to choose a folder containing one `.mhc` file and its registered `.mhn` files. The portal preserves those network names and rejects duplicate names within the configuration. **Export configuration** creates a ZIP with the `.mhc` and linked `.mhn` files in the same folder, plus any selected XSL, CQMS, or CPMS files. **Hub configuration** includes an unload action and up/down controls for the configuration network sequence.
+During an export, the portal can also generate starter XSL files, CQMS query files, and one consolidated CPMS process configuration. Review generated content and environment-specific values before deployment.
 
-Network Settings can rename, duplicate, or delete a network. Renaming also updates each element name and its connection references. New and duplicated networks are registered in the exported hub configuration; deleted networks are removed from it.
+## Library and examples
 
-## Example networks
+The built-in library contains anonymized examples and generic element templates. **Update workspace library** adds configured elements from the current browser workspace as reusable local templates.
 
-The application includes anonymized example configurations intended to demonstrate common MessageHub network structures and component types. They are bundled into the offline catalog, so the published site does not need the raw example source folder.
+Example values, paths, and comments are illustrative. Review every parameter, connection, query, path, and environment setting before using an export outside a test environment.
 
-These examples are provided as starting points for exploration and configuration. Names, comments, paths, credentials, and other deployment-specific information have been replaced with neutral example values.
+## Local storage and limits
 
-The component library also contains generic templates for commonly used MessageHub element types.
+Drafts, the open configuration, and workspace templates can be stored in the browser profile. Clearing the site data removes them. Export files regularly to keep a portable copy of work.
 
-When adapting an example to a real environment, always review its configuration before deployment.
-
-## Component library
-
-The built-in library makes it possible to add known MessageHub elements without manually writing their XML structure.
-
-Depending on the component, its configuration can include properties such as:
-
-* module and handler type
-* polling configuration
-* file and directory settings
-* network variables
-* HTTP or web-service settings
-* transformations
-* XML decorators
-* database/query configuration
-
-Values shown in example components are templates and should be reviewed before use in a real MessageHub environment.
-
-Use **Update workspace library** after importing or editing networks to add their configured elements to the reusable library stored in your browser.
-
-## Network editing
-
-Network elements can be positioned visually and connected directly in the workspace.
-
-CMHS coordinates use positive integers: `x` increases to the right and `y` increases downward. The canvas origin is `0,0`; elements begin at `5,6`, and imported negative coordinates are shifted into that valid area.
-
-When elements are copied between networks, CMHS Portal adjusts generated names where necessary to keep them unique within the destination network.
-
-Connections and references are updated as part of the editing workflow.
-
-## XSL, query, and process configuration
-
-CMHS Portal includes helpers for workflows involving XSL transformations and  queries.
-
-Generated XML files are normalized so that they contain exactly one UTF-8 XML declaration.
-
-Query configuration can be associated with specific network and XMLDecorator combinations rather than being applied globally to every generated stylesheet.
-
-During export, you can also create one CPMS file containing a `processConfig` entry for every network in the export. The supplied CPMS server placeholder is retained so it can be set for the destination environment.
-
-## Import and export
-
-The editor works with MessageHub XML configuration while attempting to preserve configuration that it does not explicitly understand.
-
-This is particularly useful when inspecting or modifying existing networks because application-specific metadata and settings can remain intact during a round trip through the editor.
-
-Always review exported configuration before installing it in a production environment.
-
-## What CMHS Portal does not do
-
-CMHS Portal is an **editor and visualization tool**.
-
-It does not:
-
-* execute MessageHub networks
-* connect to a MessageHub runtime
-* test external endpoints
-* validate credentials
-* deploy configuration to a server
-* replace environment-specific integration testing
-
-Runtime behavior should still be tested in the appropriate MessageHub environment.
-
-## Browser storage
-
-CMHS Portal can use browser local storage for items such as:
-
-* drafts
-* the currently selected network
-* workspace preferences
-* session-related UI information
-
-This information remains in the browser profile in which the application is used.
-
-Clearing the browser's site data will also clear locally stored CMHS Portal data.
-
-## Project status
-
-CMHS Portal v2 is under active development.
-
-Although automated checks are used to verify network parsing, XML generation, component handling, and other editor functionality, exported configurations should always be reviewed and tested before production use.
+CMHS Portal is an editor. It does not execute networks, connect to MessageHub, test endpoints, validate credentials, or deploy files.
 
 ## Feedback
 
-Bug reports, suggestions, and improvements are welcome through the GitHub repository.
-
-When reporting a problem involving a real MessageHub configuration, please remove customer names, credentials, hostnames, personal information, and other sensitive data before attaching files.
+Please report usability issues, unexpected XML output, missing element settings, and export problems through the GitHub repository. Remove customer names, credentials, hostnames, and personal information from any files or screenshots shared for support.
