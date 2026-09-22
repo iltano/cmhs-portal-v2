@@ -46,7 +46,7 @@ During an export, the portal can also generate starter XSL files, CQMS query fil
 
 ## Library and examples
 
-The built-in library contains anonymized examples and generic element templates. **Update workspace library** adds configured elements from the current browser workspace as reusable local templates.
+The built-in library contains anonymized examples and generic element templates. **Update workspace library** saves complete networks and configured elements from the current browser workspace as reusable local templates. Open a configuration, then drag a saved network from **Network library** into it to create a new configuration copy.
 
 Example values, paths, and comments are illustrative. Review every parameter, connection, query, path, and environment setting before using an export outside a test environment.
 
