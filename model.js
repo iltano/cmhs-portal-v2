@@ -155,10 +155,13 @@
       const a = this.node(from), b = this.node(to);
       if (!a || !b) throw new Error('Choose existing source and destination elements.');
       if (from === to) throw new Error('An element cannot connect to itself.');
-      if (this.edges.some(e => e !== existing && e.getAttribute('consumer') === to)) throw new Error('An element can receive a connection from only one source. Disconnect or reconnect its existing input first.');
       if (a.tagName === 'consumer') throw new Error('A consumer cannot start a connection.');
       if (b.tagName === 'producer') throw new Error('A producer cannot receive a connection.');
-      if (this.edges.some(e => e !== existing && e.getAttribute('producer') === from && e.getAttribute('consumer') === to)) throw new Error('This connection already exists.');
+      const incoming = this.edges.filter(e => e !== existing && e.getAttribute('consumer') === to);
+      if (incoming.some(e => e.getAttribute('producer') === from)) throw new Error('This connection already exists.');
+      // CMHS accepts one input source. Connecting to an occupied input is a
+      // replacement gesture, so remove its previous incoming connection.
+      incoming.forEach(edge => edge.remove());
       const edge = existing || this.doc.createElement('connection');
       edge.setAttribute('producer', from); edge.setAttribute('consumer', to);
       if (!existing) this.ensure(this.setup, 'connections').append(edge);

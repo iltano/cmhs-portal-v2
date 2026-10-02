@@ -9,3 +9,4 @@ BETA-TESTER-SUMMARY.md
 *.rb
 /examples/
 /data/library-seed.json
+/local-connector/appsettings.json

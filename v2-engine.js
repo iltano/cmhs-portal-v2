@@ -166,7 +166,12 @@
 
   const queue=incoming.map((n,i)=>n===0?i:-1).filter(i=>i>=0);for(let i=0;i<queue.length;i++){const a=queue[i];for(const b of outgoing[a]){layers[b]=Math.max(layers[b],layers[a]+1);if(--incoming[b]===0)queue.push(b);}}
 
-  const x0=Math.min(...nodes.map(n=>model.position(n).x)),y0=Math.min(...nodes.map(n=>model.position(n).y));
+  // A complete arrangement resets the native CMHS canvas origin.  Retaining a
+  // previous minimum here makes a graph that was once moved right/down stay
+  // offset after every subsequent Arrange operation.  For an explicitly
+  // selected fragment, retain its current origin so it can be laid out in place.
+  const x0=names?.length?Math.min(...nodes.map(n=>model.position(n).x)):CMHS.MIN_X,
+        y0=names?.length?Math.min(...nodes.map(n=>model.position(n).y)):CMHS.MIN_Y;
 
   const ordered=groups.map((g,i)=>({g,layer:layers[i]})).sort((a,b)=>a.layer-b.layer).flatMap(({g,layer})=>g.sort((a,b)=>model.position(model.node(a)).y-model.position(model.node(b)).y).map(name=>({name,layer,node:model.node(name)})));
 

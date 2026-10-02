@@ -42,7 +42,8 @@
     clearTimeout(saveTimer);persistOK=store.put('drafts',[...drafts.values()]);
     $('save-status').textContent=persistOK?'● Draft saved in this browser':'Draft not saved — export to keep changes';
   }
-  const registrationKey=(filename,name)=>`${String(filename||'').toLowerCase()}\u0000${String(name||'')}`;
+  const filenameKey=filename=>String(filename||'').split(/[\\/]/).pop().toLowerCase();
+  const registrationKey=filename=>filenameKey(filename);
   function persistHubState(){return store.put('hub-state',{xml:hubXML,filename:hubFilename,active:hubActive,removed:[...removedHubKeys]});}
   function managedNetworks(){return networks.filter(network=>network.hubManaged);}
   function persistConfigurationNetworks(){return store.put('configuration-networks',managedNetworks().map(network=>({id:network.id,filename:network.filename,name:network.name,xml:network.xml,description:network.description,nodeCount:network.nodeCount,connectionCount:network.connectionCount,imported:!!network.imported,hubManaged:true,hubKey:network.hubKey||null})));}
@@ -51,9 +52,9 @@
     let list=child(doc.documentElement,'networks');
     if(!list){list=doc.createElement('networks');doc.documentElement.append(list);}
     [...list.childNodes].filter(node=>node.nodeType===3&&!node.textContent.trim()).forEach(node=>node.remove());
-    const managed=managedNetworks(),keys=new Set([...removedHubKeys,...managed.map(network=>network.hubKey).filter(Boolean)]);
-    children(list,'network').filter(entry=>keys.has(registrationKey(entry.getAttribute('filename'),entry.getAttribute('name')))).forEach(entry=>entry.remove());
-    managed.forEach(network=>{const entry=doc.createElement('network');entry.setAttribute('filename',network.filename);entry.setAttribute('name',network.name);list.append(entry);network.hubKey=registrationKey(network.filename,network.name);const draft=drafts.get(network.id);if(draft)draft.hubKey=network.hubKey;});
+    const managed=managedNetworks(),keys=new Set([...removedHubKeys,...managed.map(network=>registrationKey(network.filename))]),filenames=new Set(managed.map(network=>filenameKey(network.filename)));
+    children(list,'network').filter(entry=>keys.has(registrationKey(entry.getAttribute('filename'))) || filenames.has(filenameKey(entry.getAttribute('filename')))).forEach(entry=>entry.remove());
+    managed.forEach(network=>{const entry=doc.createElement('network');entry.setAttribute('filename',network.filename);entry.setAttribute('name',network.name);list.append(entry);network.hubKey=registrationKey(network.filename);const draft=drafts.get(network.id);if(draft)draft.hubKey=network.hubKey;});
     removedHubKeys.clear();hubXML=CMHS.serializeDocument(doc);persistHubState();persistConfigurationNetworks();return hubXML;
   }
   function configurationDocuments(){return hubActive&&networks.find(network=>network.id===activeId)?.hubManaged?managedNetworks().map(network=>({id:network.id,filename:network.filename,xml:network.id===activeId?model.toXML():network.xml})):null;}
@@ -65,7 +66,7 @@
   }
   function addNetwork(xml,filename,options={}){
     const document=new NetworkDocument(xml,filename),requested=options.name||document.name;
-    if(options.hubManaged&&managedNetworks().some(network=>network.name===requested))throw new Error(`The configuration already contains a network named “${requested}”.`);
+    if(options.hubManaged&&managedNetworks().some(network=>filenameKey(network.filename)===filenameKey(filename)))throw new Error(`The configuration already contains a network file named “${filename}”.`);
     const name=options.hubManaged?requested:uniqueNetworkName(requested),renamed=name!==document.name;if(renamed)document.renameNetwork(name);
     document.filename=renamed?`${name}.mhn`:filename;
     const id=options.id||`import:${Date.now()}:${filename}:${networks.length}`,network={id,filename:document.filename,name:document.name,xml:document.toXML(),description:document.description,nodeCount:document.nodes.length,connectionCount:document.edges.length,imported:true,hubManaged:!!options.hubManaged,hubKey:options.hubKey||null};
@@ -99,7 +100,7 @@
     if(tab==='networks'){
       const filtered=networks.filter(n=>(n.name+' '+n.description).toLowerCase().includes(q));
       const acceptLibraryNetwork=(target,targetId=null)=>{target.ondragover=event=>{if(Array.from(event.dataTransfer.types).includes('application/x-cmhs-network')||Array.from(event.dataTransfer.types).includes('application/x-cmhs-configuration-network')){event.preventDefault();target.classList.add('network-drop-target');}};target.ondragleave=()=>target.classList.remove('network-drop-target');target.ondrop=event=>{event.preventDefault();target.classList.remove('network-drop-target');const orderedId=event.dataTransfer.getData('application/x-cmhs-configuration-network'),sourceId=event.dataTransfer.getData('application/x-cmhs-network');if(orderedId&&targetId){moveConfigurationNetworkByDrop(orderedId,targetId,event.clientY>target.getBoundingClientRect().top+target.getBoundingClientRect().height/2);return;}if(sourceId)addLibraryNetworkToConfiguration(sourceId);};};
-      const addItem=(n,configuration=false,networkSource=false)=>{const storedTemplate=workspaceNetworkTemplates.some(template=>template.id===n.id),b=button('',()=>storedTemplate?toast('Open a configuration and drag this network onto it to create a copy.'):openNetwork(n.id),'network-item'+(n.id===activeId?' active':'')+(configuration?' configuration-network':''));b.title=n.name+'\n'+(n.description||'');if(!storedTemplate)b.oncontextmenu=event=>{event.preventDefault();networkContextMenu(event,n.id);};const row=el('div','item-row');row.append(el('span','network-icon','⌘'),el('strong','',n.name));if(configuration)row.append(el('span','configuration-badge','CONFIG'));if(drafts.has(n.id))row.append(el('span','draft-dot'));b.append(row,el('small','',configuration?`${hubFilename} · ${n.nodeCount} elements`:`${n.name.match(/^\d+/)?.[0]||'CMHS'} · ${n.nodeCount} elements`));if(configuration){b.draggable=true;b.ondragstart=event=>{event.dataTransfer.setData('application/x-cmhs-configuration-network',n.id);event.dataTransfer.effectAllowed='move';};acceptLibraryNetwork(b,n.id);}else if(networkSource){b.draggable=true;b.title='Drag this network onto the open configuration to create a configuration copy.';b.ondragstart=event=>{event.dataTransfer.setData('application/x-cmhs-network',n.id);event.dataTransfer.effectAllowed='copy';};}list.append(b);};
+      const addItem=(n,configuration=false,networkSource=false)=>{const storedTemplate=workspaceNetworkTemplates.some(template=>template.id===n.id),b=button('',()=>storedTemplate?toast('Open a configuration and drag this network onto it to create a copy.'):openNetwork(n.id),'network-item'+(n.id===activeId?' active':'')+(configuration?' configuration-network':'')),label=configuration?n.filename.replace(/\.mhn$/i,''):n.name;b.title=`${n.filename}\nNETWORKNAME: ${n.name}\n${n.description||''}`;if(!storedTemplate)b.oncontextmenu=event=>{event.preventDefault();networkContextMenu(event,n.id);};const row=el('div','item-row');row.append(el('span','network-icon','⌘'),el('strong','',label));if(configuration)row.append(el('span','configuration-badge','CONFIG'));if(drafts.has(n.id))row.append(el('span','draft-dot'));b.append(row,el('small','',configuration?`NETWORKNAME: ${n.name} · ${n.nodeCount} elements`:`${n.name.match(/^\d+/)?.[0]||'CMHS'} · ${n.nodeCount} elements`));if(configuration){b.draggable=true;b.ondragstart=event=>{event.dataTransfer.setData('application/x-cmhs-configuration-network',n.id);event.dataTransfer.effectAllowed='move';};acceptLibraryNetwork(b,n.id);}else if(networkSource){b.draggable=true;b.title='Drag this network onto the open configuration to create a copy.';b.ondragstart=event=>{event.dataTransfer.setData('application/x-cmhs-network',n.id);event.dataTransfer.effectAllowed='copy';};}list.append(b);};
       const configurationNetworks=filtered.filter(n=>n.hubManaged);
       if(hubActive){const header=el('div','catalog-group configuration-drop-target',`Open configuration · ${hubFilename}`);acceptLibraryNetwork(header);list.append(header);configurationNetworks.forEach(n=>addItem(n,true));if(!configurationNetworks.length)list.append(el('p','empty-result','Drag a network from the Library here to add it to this configuration.'));}
       const networkTemplateKeys=new Set();const libraryNetworks=[...filtered.filter(n=>!n.hubManaged),...workspaceNetworkTemplates.filter(n=>(n.name+' '+(n.description||'')).toLowerCase().includes(q))].filter(n=>{const key=`${n.name}\u0000${n.xml}`;if(networkTemplateKeys.has(key))return false;networkTemplateKeys.add(key);return true;});
@@ -269,7 +270,7 @@
   }
   function settingsDialog(){
     const body=el('div');let name=model.name,desc=model.description;const vars=el('textarea','code-editor mono');vars.value=serialize(child(model.setup,'variables')||model.doc.createElement('variables'));body.append(field('Network name',name,v=>name=v,{help:'Renaming also renames every element and updates its connection references.'}),field('Description',desc,v=>desc=v,{multiline:true}),el('p','dialog-intro','NETWORKNAME controls the network title. Variables may have value attributes or nested conditionalValue elements; both are preserved.'),vars);
-    modal('Network settings',body,[{text:'Delete network',run:()=>deleteNetwork()},{text:'Duplicate network',run:()=>duplicateNetwork()},{text:'Save settings',primary:true,run:()=>{const parsed=parseXML(vars.value);if(parsed.documentElement.tagName!=='variables')throw new Error('The XML root must be variables.');const next=uniqueNetworkName(name,activeId);if(next!==name)throw new Error(`A network named “${name}” already exists.`);perform(()=>{model.setVariablesXML(vars.value);model.setDescription(desc);if(next!==model.name){model.renameNetwork(next);model.filename=next+'.mhn';}});if(hubActive)synchronizeHub();$('modal').close();}}]);
+    modal('Network settings',body,[{text:'Delete network',run:()=>deleteNetwork()},{text:'Duplicate network',run:()=>duplicateNetwork()},{text:'Save settings',primary:true,run:()=>{const parsed=parseXML(vars.value);if(parsed.documentElement.tagName!=='variables')throw new Error('The XML root must be variables.');const next=hubActive?String(name||'').trim():uniqueNetworkName(name,activeId);if(!next)throw new Error('Enter a network name.');if(!hubActive&&next!==name)throw new Error(`A network named “${name}” already exists.`);perform(()=>{model.setVariablesXML(vars.value);model.setDescription(desc);if(next!==model.name){model.renameNetwork(next);if(!hubActive)model.filename=next+'.mhn';}});if(hubActive)synchronizeHub();$('modal').close();}}]);
   }
   function unloadConfiguration(){
     if(!hubActive){toast('No configuration is open.');return;}
@@ -283,15 +284,20 @@
     if(sourceId===targetId)return false;const ordered=managedNetworks(),source=ordered.findIndex(network=>network.id===sourceId),target=ordered.findIndex(network=>network.id===targetId);if(source<0||target<0)return false;
     const [network]=ordered.splice(source,1);const destination=ordered.findIndex(item=>item.id===targetId)+(after?1:0);ordered.splice(destination,0,network);return applyConfigurationOrder(ordered);
   }
-  function uniqueConfigurationName(value){const base=String(value||'NewNetwork').trim()||'NewNetwork';let name=base,index=2;while(managedNetworks().some(network=>network.name===name))name=`${base}_${index++}`;return name;}
+  function sortConfigurationNetworks(){
+    if(!hubActive){toast('No configuration is open.',true);return;}
+    applyConfigurationOrder([...managedNetworks()].sort((a,b)=>filenameKey(a.filename).localeCompare(filenameKey(b.filename),undefined,{numeric:true,sensitivity:'base'})));
+    toast('Configuration networks sorted alphabetically by filename.');
+  }
+  function uniqueConfigurationFilename(value){const source=String(value||'NewNetwork.mhn').trim()||'NewNetwork.mhn',match=source.match(/^(.*?)(\.mhn)?$/i),stem=match[1]||'NewNetwork',extension=match[2]||'.mhn';let filename=stem+extension,index=2;while(managedNetworks().some(network=>filenameKey(network.filename)===filenameKey(filename)))filename=`${stem}_${index++}${extension}`;return filename;}
   function addLibraryNetworkToConfiguration(sourceId){
     if(!hubActive){toast('Open a configuration before adding a network from the library.',true);return;}const source=networks.find(network=>network.id===sourceId)||workspaceNetworkTemplates.find(network=>network.id===sourceId);if(!source)return;
-    let name=uniqueConfigurationName(`${source.name}_Copy`),body=el('div');body.append(el('p','dialog-intro',`Create a configuration copy of ${source.name}. Its elements will receive new serial names.`),field('Network name',name,value=>name=value));
-    modal('Add network to configuration',body,[{text:'Add network',primary:true,run:()=>{const next=String(name||'').trim();if(!next)throw new Error('Enter a network name.');if(managedNetworks().some(network=>network.name===next))throw new Error(`The configuration already contains a network named “${next}”.`);const added=addNetwork(source.xml,source.filename,{hubManaged:true,name:next,asDraft:true});synchronizeHub();$('modal').close();openNetwork(added.id);flushDrafts();setTab('networks');toast(`Added ${next} to the open configuration.`);}}]);
+    let filename=uniqueConfigurationFilename(source.filename.replace(/\.mhn$/i,'')+'_Copy.mhn'),body=el('div');body.append(el('p','dialog-intro',`Create a configuration copy of ${source.name}. Its elements will receive new serial names.`),field('Network filename',filename,value=>filename=value,{help:'The filename is the unique configuration identifier.'}));
+    modal('Add network to configuration',body,[{text:'Add network',primary:true,run:()=>{const next=String(filename||'').trim();if(!next)throw new Error('Enter a network filename.');const normalized=/\.mhn$/i.test(next)?next:next+'.mhn';if(managedNetworks().some(network=>filenameKey(network.filename)===filenameKey(normalized)))throw new Error(`The configuration already contains the file “${normalized}”.`);const name=normalized.replace(/\.mhn$/i,'');const added=addNetwork(source.xml,normalized,{hubManaged:true,name,asDraft:true});synchronizeHub();$('modal').close();openNetwork(added.id);flushDrafts();setTab('networks');toast(`Added ${normalized} to the open configuration.`);}}]);
   }
   function hubDialog(){
     const body=el('div'),input=el('textarea','code-editor mono');input.value=hubXML;body.append(el('p','dialog-intro',hubActive?'This open configuration is kept synchronized with its loaded networks. Exporting the configuration includes the .mhc and every registered .mhn file. Unloading it removes only its linked networks from this local workspace.':'Global variables and network registrations from main.mhc. Import a configuration folder to load its linked networks together.'));
-    body.append(input);const actions=[];if(hubActive)actions.push({text:'Unload configuration',run:()=>unloadConfiguration()});actions.push({text:'Save local draft',run:()=>{if(parseXML(input.value).documentElement.tagName!=='messagehub')throw new Error('The root must be messagehub.');hubXML=input.value;const ok=persistHubState();$('modal').close();toast(ok?'Hub draft saved locally.':'Hub draft kept for this session.',!ok);}},{text:'Export .mhc',primary:true,run:()=>{if(parseXML(input.value).documentElement.tagName!=='messagehub')throw new Error('The root must be messagehub.');hubXML=input.value;download(hubActive?synchronizeHub():hubXML,hubFilename,'application/xml');}});modal('Hub configuration',body,actions);
+    body.append(input);const actions=[{text:'Load from local connector',run:()=>{$('modal').close();loadConnectorConfiguration();}}];if(hubActive)actions.push({text:'Sort networks A–Z',run:()=>{sortConfigurationNetworks();$('modal').close();}},{text:'Unload configuration',run:()=>unloadConfiguration()});actions.push({text:'Save local draft',run:()=>{if(parseXML(input.value).documentElement.tagName!=='messagehub')throw new Error('The root must be messagehub.');hubXML=input.value;const ok=persistHubState();$('modal').close();toast(ok?'Hub draft saved locally.':'Hub draft kept for this session.',!ok);}},{text:'Export .mhc',primary:true,run:()=>{if(parseXML(input.value).documentElement.tagName!=='messagehub')throw new Error('The root must be messagehub.');hubXML=input.value;download(hubActive?synchronizeHub():hubXML,hubFilename,'application/xml');}});modal('Hub configuration',body,actions);
   }
   function newNetwork(){let name='NewNetwork';const body=el('div');body.append(field('Network name',name,v=>name=v),el('p','dialog-intro',hubActive?'The new network will be added to the open configuration.':'Start from an empty network, then choose a source from the library.'));modal('New network',body,[{text:'Create network',primary:true,run:()=>{if(!name.trim())throw new Error('Enter a network name.');const next=uniqueNetworkName(name);if(next!==name)throw new Error(`A network named “${name}” already exists.`);const doc=NetworkDocument.empty(name),id='custom:'+Date.now()+'.mhn',network={id,name,filename:name+'.mhn',xml:doc.toXML(),description:'',nodeCount:0,connectionCount:0,imported:true,hubManaged:hubActive,hubKey:null};networks.push(network);if(hubActive)synchronizeHub();$('modal').close();openNetwork(id);saveDraft();setTab('library');}}]);}
   function duplicateNetwork(){
@@ -301,13 +307,13 @@
   }
   function deleteNetwork(){
     const index=networks.findIndex(network=>network.id===activeId);if(index<0)return;const network=networks[index];
-    if(network.hubManaged&&network.hubKey)removedHubKeys.add(network.hubKey);networks.splice(index,1);drafts.delete(network.id);store.put('drafts',[...drafts.values()]);if(hubActive)synchronizeHub();$('modal').close();const next=networks[index]||networks[index-1];if(next)openNetwork(next.id);else{activeId=null;model=null;renderCatalog();}toast(`Deleted ${network.name} from this local workspace.`);
+    if(network.hubManaged)removedHubKeys.add(registrationKey(network.filename));networks.splice(index,1);drafts.delete(network.id);store.put('drafts',[...drafts.values()]);if(hubActive)synchronizeHub();$('modal').close();const next=networks[index]||networks[index-1];if(next)openNetwork(next.id);else{activeId=null;model=null;renderCatalog();}toast(`Deleted ${network.filename} from this local workspace.`);
   }
   let networkMenu=null,networkMenuTarget=null;
   function hideNetworkMenu(){if(networkMenu){networkMenu.remove();networkMenu=null;}networkMenuTarget=null;}
   function renameNetworkDialog(id){
-    openNetwork(id);let name=model.name;const body=el('div');body.append(field('Network name',name,value=>name=value,{help:'Renaming also renames every element and updates its connection references.'}));
-    modal('Rename network',body,[{text:'Rename network',primary:true,run:()=>{const next=uniqueNetworkName(name,activeId);if(next!==name)throw new Error(`A network named “${name}” already exists.`);if(next!==model.name){perform(()=>{model.renameNetwork(next);model.filename=next+'.mhn';});if(hubActive)synchronizeHub();}$('modal').close();}}]);
+    openNetwork(id);let name=model.name;const body=el('div');body.append(field('NETWORKNAME',name,value=>name=value,{help:'Renaming also renames every element and updates its connection references. The .mhn filename remains the configuration identity.'}));
+    modal('Rename network',body,[{text:'Rename network',primary:true,run:()=>{const next=hubActive?String(name||'').trim():uniqueNetworkName(name,activeId);if(!next)throw new Error('Enter a network name.');if(!hubActive&&next!==name)throw new Error(`A network named “${name}” already exists.`);if(next!==model.name){perform(()=>{model.renameNetwork(next);if(!hubActive)model.filename=next+'.mhn';});if(hubActive)synchronizeHub();}$('modal').close();}}]);
   }
   function networkContextMenu(event,id){
     hideNetworkMenu();networkMenuTarget=id;const network=networks.find(item=>item.id===id);if(!network)return;
@@ -333,23 +339,35 @@
   function download(text,name,type){const url=URL.createObjectURL(new Blob([text],{type})),a=el('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);}
   function deleteSelection(){if(selection?.kind==='nodes')perform(()=>{selection.names.forEach(n=>model.remove(n));selection=null;});else if(selection?.kind==='node')perform(()=>{model.remove(selection.name);selection=null;});else if(selection?.kind==='edge')perform(()=>{model.edges[selection.index].remove();selection=null;});}
   function undo(redo=false){if(!model)return;const xml=redo?history.redo(model.toXML()):history.undo(model.toXML());if(!xml)return;model=new NetworkDocument(xml,model.filename);selection=null;pending=null;saveDraft();renderAll();}
-  async function importFiles(files){
-    const parsed=[];for(const file of files){if(!/\.(mhn|mhc|xml)$/i.test(file.name))continue;try{const xml=await file.text(),doc=parseXML(xml);parsed.push({file,xml,doc});}catch(e){toast(`${file.name}: ${e.message}`,true);}}
+  function importParsedDocuments(parsed){
     const hub=parsed.find(entry=>entry.doc.documentElement.tagName==='messagehub');let count=0,last=null,linked=new Set();
     if(hub){
       if(hubActive)unloadConfiguration();
       hubXML=hub.xml;hubFilename=hub.file.name;hubActive=true;removedHubKeys.clear();const registrations=children(child(hub.doc.documentElement,'networks'),'network');
-      registrations.forEach(registration=>{const filename=registration.getAttribute('filename')||'',match=parsed.find(entry=>entry!==hub&&entry.doc.documentElement.tagName==='messagehubnetwork'&&entry.file.name.toLowerCase()===filename.toLowerCase());if(!match)return;linked.add(match);try{const network=addNetwork(match.xml,match.file.name,{hubManaged:true,hubKey:registrationKey(filename,registration.getAttribute('name'))});count++;last=network.id;}catch(error){toast(`${match.file.name}: ${error.message}`,true);}});
+      registrations.forEach(registration=>{const filename=registration.getAttribute('filename')||'',match=parsed.find(entry=>entry!==hub&&entry.doc.documentElement.tagName==='messagehubnetwork'&&filenameKey(entry.file.name)===filenameKey(filename));if(!match)return;linked.add(match);try{const network=addNetwork(match.xml,match.file.name,{hubManaged:true,hubKey:registrationKey(filename)});count++;last=network.id;}catch(error){toast(`${match.file.name}: ${error.message}`,true);}});
       synchronizeHub();const missing=registrations.length-count;if(missing)toast(`${missing} linked network${missing===1?' was':'s were'} not selected. Choose the configuration folder or select the .mhc and all registered .mhn files together.`,true);
     }
     if(!hub)parsed.filter(entry=>entry.doc.documentElement.tagName==='messagehubnetwork').forEach(entry=>{try{const network=addNetwork(entry.xml,entry.file.name);count++;last=network.id;}catch(error){toast(`${entry.file.name}: ${error.message}`,true);}});
     if(last){openNetwork(last);flushDrafts();setTab('networks');toast(hub?`Opened configuration with ${count} linked network${count===1?'':'s'}.`:`Imported ${count} network${count===1?'':'s'} as local drafts.`);}
     else if(hub){persistHubState();toast('Configuration imported. Select its folder or its registered .mhn files to load the linked networks.',true);}
   }
+  async function importFiles(files){
+    const parsed=[];for(const file of files){if(!/\.(mhn|mhc|xml)$/i.test(file.name))continue;try{const xml=await file.text(),doc=parseXML(xml);parsed.push({file,xml,doc});}catch(e){toast(`${file.name}: ${e.message}`,true);}}
+    importParsedDocuments(parsed);
+  }
+  async function loadConnectorConfiguration(){
+    if(!window.CMHS_CONNECTOR_POC){toast('The local connector proof of concept is unavailable in this portal build.',true);return;}
+    toast('Reading CMHS configuration through the local connector…');
+    try{
+      const xml=await window.CMHS_CONNECTOR_POC.loadConfiguration(),doc=parseXML(xml);
+      if(doc.documentElement.tagName!=='messagehub')throw new Error('The returned cmhsConfig XML is not a .mhc Message Hub configuration.');
+      importParsedDocuments([{file:{name:'CMHS_configuration.mhc'},xml,doc}]);
+    }catch(error){toast(`Local connector: ${error.message}`,true);}
+  }
   function help(){const body=el('div','guide-grid');[
     ['1 · Choose a network','Open any of the bundled networks or import .mhn files. Your original XML stays untouched. Local drafts survive reloads when browser storage is available.'],
     ['2 · Shape the flow','Drag nodes to move them; drag the background to pan and scroll to zoom. Use Fit (F) to see the entire network. Positions are exported in native CMHS coordinates.'],
-    ['3 · Connect elements','Click an output port followed by an input port, or use Connect (C) and click two nodes. Select a line to change endpoints or delete it.'],
+    ['3 · Connect elements','Click an output port followed by an input port, or use Connect (C) and click two nodes. Connecting to an occupied input replaces its previous incoming connection.'],
     ['4 · Reuse example settings',`The Library contains ${data.definitions.length} element types and ${data.instances.length} anonymous examples and generic templates. Pick an example, add it, then review its parameters. A producer replaces the network’s single source.`],
     ['5 · Edit with confidence','Rename, duplicate or delete elements; edit parameters, comments, attributes and complete element XML. Undo/redo supports all network edits. Renaming updates connection references.'],
     ['6 · Export a modified copy','Check network, then Export .mhn. The XML retains unknown settings and metadata. Export main.mhc separately if you change network registrations. This editor does not execute networks.'],
@@ -401,5 +419,5 @@
     persistConfigurationNetworks();
     flushDrafts();renderAll();
   }
-  window.CMHS_STUDIO={get model(){return model;},get selection(){return selection;},get catalog(){return data;},openNetwork,importFiles,perform,renderAll,fit,toast,modal,field,section,panelHeader,button,el,store,saveDraft,flushDrafts,deleteSelection,selectedNames,setSelectedNames,commitNetworks,templateNetwork,refreshWorkspaceLibrary,get activeId(){return activeId;},get networks(){return networks;},get drafts(){return drafts;},configurationDocuments,configurationExport,canvasPosition(clientX,clientY){const r=$('canvas').getBoundingClientRect();return{x:Math.max(CMHS.MIN_X,((clientX-r.left-view.x)/view.z-40)/SX),y:Math.max(CMHS.MIN_Y,((clientY-r.top-view.y)/view.z-40)/SY)};},centerPosition(){const r=$('canvas').getBoundingClientRect();return this.canvasPosition(r.left+r.width/2,r.top+r.height/2);}};
+  window.CMHS_STUDIO={get model(){return model;},get selection(){return selection;},get catalog(){return data;},openNetwork,importFiles,loadConnectorConfiguration,perform,renderAll,fit,toast,modal,field,section,panelHeader,button,el,store,saveDraft,flushDrafts,deleteSelection,selectedNames,setSelectedNames,commitNetworks,templateNetwork,refreshWorkspaceLibrary,get activeId(){return activeId;},get networks(){return networks;},get drafts(){return drafts;},configurationDocuments,configurationExport,canvasPosition(clientX,clientY){const r=$('canvas').getBoundingClientRect();return{x:Math.max(CMHS.MIN_X,((clientX-r.left-view.x)/view.z-40)/SX),y:Math.max(CMHS.MIN_Y,((clientY-r.top-view.y)/view.z-40)/SY)};},centerPosition(){const r=$('canvas').getBoundingClientRect();return this.canvasPosition(r.left+r.width/2,r.top+r.height/2);}};
 })();

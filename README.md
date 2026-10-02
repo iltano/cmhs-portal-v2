@@ -18,6 +18,7 @@ The portal always downloads a new file or ZIP. It never overwrites the source fi
 
 - View producers, processors, consumers, and their connections as a diagram.
 - Move elements, pan, zoom, arrange the graph, and align selected elements.
+- Connect a new source to an occupied input; its previous incoming connection is replaced automatically.
 - Add components by dragging them from the library.
 - Copy and paste configured parts of a network into another network.
 - Add file writers or database log writers.
@@ -30,9 +31,9 @@ New, copied, and renamed elements use a component type plus serial convention, f
 
 ## Configurations
 
-**Import configuration** opens the `.mhc` and only the `.mhn` files it registers. Imported configuration network names are preserved. Duplicate network names within one configuration are rejected.
+**Import configuration** opens the `.mhc` and only the `.mhn` files it registers. The `.mhn` filename is the configuration identifier, so one configuration can contain different files with the same `NETWORKNAME` parameter. Filenames must be unique within a configuration.
 
-Use **Hub configuration** to review the configuration XML or unload the configuration from the browser workspace. Drag configuration entries in the left panel to change their registration sequence. When a configuration is open, the same panel includes a **Network library**: drag a network from it onto the configuration to create a named configuration copy. The lower-left **Unload configuration** action removes linked networks from the local workspace.
+Use **Hub configuration** to review the configuration XML, sort its networks alphabetically by filename, load an `.mhc` from the local CAIS connector, or unload the configuration from the browser workspace. Drag configuration entries in the left panel to change their registration sequence. When a configuration is open, the same panel includes a **Network library**: drag a network from it onto the configuration to create a named configuration copy. The lower-left **Unload configuration** action removes linked networks from the local workspace.
 
 ## Export choices
 
@@ -55,6 +56,10 @@ Example values, paths, and comments are illustrative. Review every parameter, co
 Drafts, the open configuration, and workspace templates can be stored in the browser profile. Clearing the site data removes them. Export files regularly to keep a portable copy of work.
 
 CMHS Portal is an editor. It does not execute networks, connect to MessageHub, test endpoints, validate credentials, or deploy files.
+
+## Local connector proof of concept
+
+When the optional loopback connector is installed and running, open **Hub configuration** and choose **Load from local connector**. The portal sends a read-only `CMHS` command that queries the stored configuration through the existing CAIS endpoint. It reads `queryResults/record/column[@name='cmhsConfig']` from the response and opens the returned `.mhc` locally. The connector remains responsible for CORS and for the fixed local CAIS target; the portal does not store credentials.
 
 ## Feedback
 

@@ -8,15 +8,16 @@
  assert(E.queryRows('queryname,parameters,network\nQ,id:string=42,Example')[0].network==='Example','Network filter');
  rejects(()=>E.csv('"unfinished'));rejects(()=>E.queryRows('Q\nQ'));rejects(()=>E.queryRows('queryname,sql\nQ'));rejects(()=>E.queryRows('../Q'));rejects(()=>E.queryRows('Custom/CMHS/X/Q'));
  const params=E.parameterSpecs('id:string=42;code:int=1',null);assert(params[1].type==='int'&&params[0].defaultvalue==='42','Parameter specs');rejects(()=>E.parameterSpecs('id;id',null));
+ assert(CMHS_CONNECTOR_POC.soapRequest().includes('<cais:commandName>CMHS</cais:commandName>')&&CMHS_CONNECTOR_POC.soapRequest().includes("settingname='configuration'"),'Local connector POC builds the CMHS configuration query');
  const nodes=['a','b','c'].map((name,i)=>({getAttribute:k=>k==='name'?name:null,p:{x:i*7,y:i*11}}));const edges=[['a','b'],['b','a'],['b','c']].map(([a,b])=>({getAttribute:k=>k==='producer'?a:b}));const model={nodes,edges,node:name=>nodes.find(n=>n.getAttribute('name')===name),position:n=>({...n.p}),move(name,x,y){this.node(name).p={x,y};}};
- E.layout(model);assert(nodes[2].p.x>nodes[0].p.x&&nodes[0].p.y!==nodes[1].p.y,'Layout handles cycles');E.align(model,['a','b','c'],'left');assert(nodes.every(n=>n.p.x===nodes[0].p.x),'Align');E.align(model,['a','b','c'],'space-y');assert(nodes.map(n=>n.p.y).sort((a,b)=>a-b)[1]===41,'Distribute');
+ E.layout(model);assert(nodes[2].p.x>nodes[0].p.x&&nodes[0].p.y!==nodes[1].p.y,'Layout handles cycles');assert(Math.min(...nodes.map(n=>n.p.x))===CMHS.MIN_X&&Math.min(...nodes.map(n=>n.p.y))===CMHS.MIN_Y,'Full layout resets to the native CMHS origin');E.align(model,['a','b','c'],'left');assert(nodes.every(n=>n.p.x===nodes[0].p.x),'Align');E.align(model,['a','b','c'],'space-y');assert(nodes.map(n=>n.p.y).sort((a,b)=>a-b)[1]===47,'Distribute');
  const node=(name,role)=>({tagName:role,children:[],hasAttribute:()=>true,getAttribute:k=>({name,typename:'Example',module:'Example.cem',x:'0',y:'0'})[k]??null});
  const source=node('source','producer'),processor=node('processor','processor'),other=node('other','processor'),output=node('output','consumer');
  const edge=(from,to)=>({getAttribute:k=>k==='producer'?from:to,setAttribute(k,v){if(k==='producer')from=v;else to=v;}});
  const links=[edge('source','processor'),edge('processor','output')];
  const graph={nodes:[source,processor,other,output],edges:links,node(name){return this.nodes.find(n=>n.getAttribute('name')===name);},setup:{children:[source]}};
  const connect=(from,to,existing)=>CMHS.NetworkDocument.prototype.connect.call(graph,from,to,existing);
- rejects(()=>connect('processor','processor'));rejects(()=>connect('other','output'));rejects(()=>connect('source','output'));
+ rejects(()=>connect('processor','processor'));rejects(()=>connect('output','processor'));rejects(()=>connect('processor','source'));
  checkRewire: {const existing=links[1];connect('other','output',existing);assert(existing.getAttribute('producer')==='other','Reconnect excludes its own old input');connect('processor','output',existing);}
  const issues=()=>CMHS.NetworkDocument.prototype.issues.call(graph).filter(i=>i.level==='error');assert(issues().length===0,'Connected source and output valid');
  graph.edges=[edge('source','processor')];assert(issues().some(i=>i.message.includes('output consumer')),'Unreachable output rejected');
