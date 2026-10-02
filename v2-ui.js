@@ -48,7 +48,7 @@
    note(area,'Query paths: Custom/CMHS/<network>/<queryname>. Each selected XSL uses only the queries from its chosen decorator. Existing XSL files remain unchanged.');
   }
   createCPMS=check(body,'Create one consolidated CPMS process configuration');
-  note(body,'Adds one processConfig entry for every exported network to CPMS/cmhs-process-config.xml. The CPMS server placeholder remains unchanged.');
+  note(body,'Adds one processConfig entry for every exported network to CPMS/cmhs-process-config.xml. Process names and include-network use the unique .mhn filename without its extension. The CPMS server placeholder remains unchanged.');
   const preview=el('pre','v2-preview');body.append(preview);
   const build=()=>{
    const xslNodes=Object.create(null),xslDecorators=Object.create(null),queryMappings=[];

@@ -43,7 +43,7 @@ Use **Hub configuration** to review the configuration XML, sort its networks alp
 | **Export updated networks** | Only networks changed after import or creation. |
 | **Export configuration** | A ZIP containing the `.mhc` and all linked `.mhn` files together, plus selected generated files. |
 
-During an export, the portal can also generate starter XSL files, CQMS query files, and one consolidated CPMS process configuration. Review generated content and environment-specific values before deployment.
+During an export, the portal can also generate starter XSL files, CQMS query files, and one consolidated CPMS process configuration. CPMS process codes, display names, and `include-network` use the unique `.mhn` filename without its extension. Review generated content and environment-specific values before deployment.
 
 ## Library and examples
 

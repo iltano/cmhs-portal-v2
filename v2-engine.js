@@ -289,7 +289,7 @@
 
   const doc=parseXML(templateXML);assert(doc.documentElement.tagName==='configuration','CPMS template must have a configuration root.');const configs=child(doc.documentElement,'processConfigs');assert(configs,'CPMS template has no processConfigs section.');const template=child(configs,'processConfig');assert(template,'CPMS template has no processConfig entry.');const names=new Set();
 
-  configs.replaceChildren();networks.forEach(network=>{assert(!names.has(network),`Duplicate network name in CPMS export: ${network}.`);names.add(network);const process=template.cloneNode(true),parameters=child(process,'parameters'),configuration=parameters&&child(parameters,'cmhs-configuration'),included=configuration&&child(configuration,'include-network');assert(included,`CPMS template processConfig must contain parameters/cmhs-configuration/include-network.`);process.setAttribute('code',`cmhs_${network}`);process.setAttribute('name',`CMHS - ${network}`);included.textContent=network;configs.append(process);});
+  configs.replaceChildren();networks.forEach(item=>{const network=typeof item==='string'?item:item.network,filename=typeof item==='string'?item:item.filename,identity=safeName(String(filename||network).replace(/\.mhn$/i,''));assert(network,'CPMS export needs a NETWORKNAME value.');assert(!names.has(identity),`Duplicate network filename in CPMS export: ${filename}.`);names.add(identity);const process=template.cloneNode(true),parameters=child(process,'parameters'),configuration=parameters&&child(parameters,'cmhs-configuration'),included=configuration&&child(configuration,'include-network');assert(included,`CPMS template processConfig must contain parameters/cmhs-configuration/include-network.`);process.setAttribute('code',`cmhs_${identity}`);process.setAttribute('name',`CMHS - ${identity}`);included.textContent=identity;configs.append(process);});
 
   return serializeDocument(doc);
 
@@ -323,7 +323,7 @@
 
    }add(`${networkFolder}${filename}.mhn`,m.toXML());updates.push({id:item.id,xml:m.toXML()});
 
-  }if(cpms){assert(templates?.cpms,'CPMS template is unavailable.');add('CPMS/cmhs-process-config.xml',generateCPMS(parsed.map(({model:m})=>m.name),templates.cpms));}return{files,updates};
+  }if(cpms){assert(templates?.cpms,'CPMS template is unavailable.');add('CPMS/cmhs-process-config.xml',generateCPMS(parsed.map(({item,model:m})=>({filename:item.filename||`${m.name}.mhn`,network:m.name})),templates.cpms));}return{files,updates};
 
  }
 
