@@ -173,7 +173,11 @@
   const x0=names?.length?Math.min(...nodes.map(n=>model.position(n).x)):CMHS.MIN_X,
         y0=names?.length?Math.min(...nodes.map(n=>model.position(n).y)):CMHS.MIN_Y;
 
-  const ordered=groups.map((g,i)=>({g,layer:layers[i]})).sort((a,b)=>a.layer-b.layer).flatMap(({g,layer})=>g.sort((a,b)=>model.position(model.node(a)).y-model.position(model.node(b)).y).map(name=>({name,layer,node:model.node(name)})));
+  // Put the longest downstream paths first. This keeps the primary business
+  // flow at the top even when the source XML happened to list a shorter
+  // branch before it.
+  const depth=new Map();function longest(group){if(depth.has(group))return depth.get(group);const value=outgoing[group].size?1+Math.max(...[...outgoing[group]].map(longest)):1;depth.set(group,value);return value;}groups.forEach((_,index)=>longest(index));
+  const ordered=groups.map((g,i)=>({g,layer:layers[i],depth:depth.get(i)})).sort((a,b)=>a.layer-b.layer||b.depth-a.depth).flatMap(({g,layer,depth})=>g.sort((a,b)=>model.position(model.node(a)).y-model.position(model.node(b)).y).map(name=>({name,layer,depth,node:model.node(name)})));
 
   const topRows=new Map();let topBottom=y0-82;
 
@@ -184,6 +188,13 @@
   const outputStart=topBottom+110,outputRows=new Map();
 
   ordered.filter(v=>v.node.tagName==='consumer').forEach(({name,layer})=>{const row=outputRows.get(layer)||0;model.move(name,x0+layer*150,outputStart+row*82);outputRows.set(layer,row+1);});
+
+  // Pull each earlier layer back toward its downstream processors. This is a
+  // reverse-gravity pass: readers use otherwise empty vertical space beside
+  // their path instead of being left in a simple sequential source row.
+  const nonConsumers=ordered.filter(v=>v.node.tagName!=='consumer'),byLayer=new Map();nonConsumers.forEach(item=>{const list=byLayer.get(item.layer)||[];list.push(item);byLayer.set(item.layer,list);});
+  const nearestFreeRow=(preferred,used)=>{let distance=0;while(distance<1000){for(const row of distance?[preferred-distance,preferred+distance]:[preferred])if(row>=0&&!used.has(row)){used.add(row);return row;}distance++;}return preferred;};
+  [...byLayer.keys()].sort((a,b)=>b-a).forEach(layer=>{const used=new Set();byLayer.get(layer).sort((a,b)=>b.depth-a.depth||model.position(a.node).y-model.position(b.node).y).forEach(item=>{const downstream=(adj.get(item.name)||[]).map(name=>model.node(name)).filter(node=>node&&node.tagName!=='consumer').map(node=>model.position(node).y);const preferred=downstream.length?Math.round((Math.min(...downstream)-y0)/82):Math.round((model.position(item.node).y-y0)/82);const row=nearestFreeRow(preferred,used);model.move(item.name,x0+item.layer*150,y0+row*82);});});
 
  }
 

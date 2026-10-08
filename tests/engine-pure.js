@@ -37,6 +37,9 @@
  const laneNodes=[node('p','producer'),node('a','processor'),node('b','processor'),node('early','consumer'),node('late','consumer')];laneNodes.forEach((n,i)=>n.p={x:i*5,y:i*7});
  const lanes={nodes:laneNodes,edges:[edge('p','a'),edge('p','early'),edge('a','b'),edge('b','late')],node(name){return this.nodes.find(n=>n.getAttribute('name')===name);},position:n=>({...n.p}),move(name,x,y){this.node(name).p={x,y};}};
  E.layout(lanes);assert(Math.min(...laneNodes.filter(n=>n.tagName==='consumer').map(n=>n.p.y))>Math.max(...laneNodes.filter(n=>n.tagName!=='consumer').map(n=>n.p.y)),'All outputs arranged below processors, including early branches');
+ const branchNodes=[node('shortReader','producer'),node('longReader','producer'),node('shortProcessor','processor'),node('longProcessor1','processor'),node('longProcessor2','processor'),node('shortOutput','consumer'),node('longOutput','consumer')];branchNodes.forEach((n,i)=>n.p={x:i*9,y:(branchNodes.length-i)*7});
+ const branches={nodes:branchNodes,edges:[edge('shortReader','shortProcessor'),edge('shortProcessor','shortOutput'),edge('longReader','longProcessor1'),edge('longProcessor1','longProcessor2'),edge('longProcessor2','longOutput')],node(name){return this.nodes.find(n=>n.getAttribute('name')===name);},position:n=>({...n.p}),move(name,x,y){this.node(name).p={x,y};}};
+ E.layout(branches);assert(branches.position(branches.node('longReader')).y<branches.position(branches.node('shortReader')).y&&branches.position(branches.node('longProcessor1')).y<branches.position(branches.node('shortProcessor')).y,'Longest branch is arranged at the top');
  const targets=[{network:'A',decorator:'D1'},{network:'A',decorator:'D2'},{network:'B',decorator:'D1'}];
  const mapped=E.queryRows('network,decorator,queryname\nA,D1,First\nA,D2,Second\nB,D1,First');
  assert(E.validateQueryMappings(targets,mapped).length===3,'Queries map to exact network/decorator pairs');

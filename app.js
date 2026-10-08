@@ -54,7 +54,7 @@
     [...list.childNodes].filter(node=>node.nodeType===3&&!node.textContent.trim()).forEach(node=>node.remove());
     const managed=managedNetworks(),keys=new Set([...removedHubKeys,...managed.map(network=>registrationKey(network.filename))]),filenames=new Set(managed.map(network=>filenameKey(network.filename)));
     children(list,'network').filter(entry=>keys.has(registrationKey(entry.getAttribute('filename'))) || filenames.has(filenameKey(entry.getAttribute('filename')))).forEach(entry=>entry.remove());
-    managed.forEach(network=>{const entry=doc.createElement('network');entry.setAttribute('filename',network.filename);entry.setAttribute('name',network.name);list.append(entry);network.hubKey=registrationKey(network.filename);const draft=drafts.get(network.id);if(draft)draft.hubKey=network.hubKey;});
+    managed.forEach(network=>{const entry=doc.createElement('network'),stem=String(network.filename||'').split(/[\\/]/).pop().replace(/\.mhn$/i,'');entry.setAttribute('filename',network.filename);entry.setAttribute('name',stem);list.append(entry);network.hubKey=registrationKey(network.filename);const draft=drafts.get(network.id);if(draft)draft.hubKey=network.hubKey;});
     removedHubKeys.clear();hubXML=CMHS.serializeDocument(doc);persistHubState();persistConfigurationNetworks();return hubXML;
   }
   function configurationDocuments(){return hubActive&&networks.find(network=>network.id===activeId)?.hubManaged?managedNetworks().map(network=>({id:network.id,filename:network.filename,xml:network.id===activeId?model.toXML():network.xml})):null;}
