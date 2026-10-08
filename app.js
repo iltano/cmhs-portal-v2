@@ -140,7 +140,7 @@
     });
     model.nodes.forEach(n=>{
       const name=n.getAttribute('name'),p=worldPos(n),r=n.tagName,typename=n.getAttribute('typename'),selected=(selection?.kind==='node'&&selection.name===name)||(selection?.kind==='nodes'&&selection.names.includes(name));
-      const g=svg('g',{class:'node'+(selected?' selected':''),'data-node':name,transform:`translate(${p.x} ${p.y})`,tabindex:'0',role:'button','aria-label':`${name}, ${r}, ${typename}`});
+      const g=svg('g',{class:'node'+(selected?' selected':''),'data-node':name,transform:`translate(${p.x} ${p.y})`,cursor:(tool==='connect'||pending)?'crosshair':'grab',tabindex:'0',role:'button','aria-label':`${name}, ${r}, ${typename}`});
       const title=svg('title');title.textContent=name+'\n'+typename+'\n'+(child(n,'comment')?.textContent||'');g.append(title);
       g.append(svg('rect',{width:W,height:H,rx:9,class:'node-bg'}),svg('rect',{x:12,y:12,width:25,height:25,rx:7,fill:color[r]+'14'}));
       const icon=svg('text',{x:24.5,y:29,'text-anchor':'middle',fill:color[r],'font-size':17});icon.textContent=symbols[r];g.append(icon);
@@ -167,13 +167,18 @@
     const x=(point.x-r.left-view.x)/view.z,y=(point.y-r.top-view.y)/view.z,offset=Math.max(45,Math.abs(x-p.x-W)*.48);
     edge.setAttribute('d',`M${p.x+W} ${p.y+H/2} C${p.x+W+offset} ${p.y+H/2},${x-offset} ${y},${x} ${y}`);
   }
-  function port(name,side,x,y){const p=svg('circle',{cx:x,cy:y,r:5,class:'port','data-port':side,'aria-label':`${name} ${side==='out'?'output':'input'} port`});p.addEventListener('pointerdown',e=>{e.stopPropagation();e.preventDefault();if(side==='out'){pending=name;pointerPosition={x:e.clientX,y:e.clientY};$('canvas-hint').textContent='Now click a destination input port · Esc to cancel';renderGraph();}else if(pending)completeConnection(name);else toast('Choose a source output port first.');});return p;}
+  function beginConnection(name,event){
+    if(model.node(name).tagName==='consumer'){toast('Start from a producer or processor.');return;}
+    pending=name;pointerPosition={x:event.clientX,y:event.clientY};setHint();renderGraph();
+  }
+  function port(name,side,x,y){const p=svg('circle',{cx:x,cy:y,r:5,class:'port','data-port':side,'aria-label':`${name} ${side==='out'?'output':'input'} port`});p.addEventListener('pointerdown',e=>{e.stopPropagation();e.preventDefault();if(side==='out')beginConnection(name,e);else if(pending)completeConnection(name);else toast('Choose a source box first.');});return p;}
   function completeConnection(to){const from=pending;if(!from)return;perform(()=>{const index=model.connect(from,to);selection={kind:'edge',index};pending=null;});setHint();}
-  function setHint(){$('canvas-hint').textContent=pending?'Choose a destination input port · Esc to cancel':tool==='connect'?'Click a source, then a destination · Esc to cancel':'Drag elements · Drag background to pan · Scroll to zoom';}
+  function setHint(){$('canvas-hint').textContent=pending?'Click the destination box · Esc to cancel':tool==='connect'?'Click a source box, then a destination box · Esc to cancel':'Drag elements · Drag background to pan · Scroll to zoom';}
   function setTool(next){tool=next;pending=null;$('select-tool').classList.toggle('active',next==='select');$('connect-tool').classList.toggle('active',next==='connect');$('canvas').classList.toggle('connecting',next==='connect');setHint();if(model)renderGraph();}
   function nodePointerDown(e,name){
     if(e.button!==0)return;e.stopPropagation();
-    if(tool==='connect'){if(pending)completeConnection(name);else if(model.node(name).tagName!=='consumer'){pending=name;pointerPosition={x:e.clientX,y:e.clientY};setHint();renderGraph();}else toast('Start from a producer or processor.');return;}
+    if(pending){completeConnection(name);return;}
+    if(tool==='connect'){beginConnection(name,e);return;}
     if(e.shiftKey||e.ctrlKey||e.metaKey){const names=new Set(selectedNames());names.has(name)?names.delete(name):names.add(name);setSelectedNames([...names]);return;}
     if(!selectedNames().includes(name))selection={kind:'node',name};
     const members=selectedNames().map(n=>({name:n,...model.position(model.node(n))})),p=model.position(model.node(name));
