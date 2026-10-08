@@ -357,11 +357,12 @@
   }
   async function loadConnectorConfiguration(){
     if(!window.CMHS_CONNECTOR_POC){toast('The OIR connector client is unavailable in this portal build.',true);return;}
-    toast('Reading CMHS configuration through the OIR connector…');
+    toast('Reading the CMHS configuration and networks through the OIR connector…');
     try{
-      const xml=await window.CMHS_CONNECTOR_POC.loadConfiguration(),doc=parseXML(xml);
+      const workspace=await window.CMHS_CONNECTOR_POC.loadWorkspace(),xml=workspace.configuration.xml,doc=parseXML(xml);
       if(doc.documentElement.tagName!=='messagehub')throw new Error('The returned cmhsConfig XML is not a .mhc Message Hub configuration.');
-      importParsedDocuments([{file:{name:'CMHS_configuration.mhc'},xml,doc}]);
+      const parsed=[{file:{name:workspace.configuration.filename},xml,doc},...workspace.networks.map(network=>({file:{name:network.filename},xml:network.xml,doc:parseXML(network.xml)}))];
+      importParsedDocuments(parsed);
     }catch(error){toast(`OIR connector: ${error.message}`,true);}
   }
   function help(){const body=el('div','guide-grid');[
@@ -381,7 +382,7 @@
   ['zoom-in','zoom-out','zoom-value'].forEach(id=>$(id).addEventListener('pointerdown',event=>event.stopPropagation()));
   $('zoom-in').onclick=event=>{event.preventDefault();zoom(1.2);};$('zoom-out').onclick=event=>{event.preventDefault();zoom(1/1.2);};$('zoom-value').onclick=event=>{event.preventDefault();zoom(1/view.z);};
   $('new-btn').onclick=newNetwork;$('refresh-library-btn').onclick=refreshWorkspaceLibrary;$('network-settings-btn').onclick=settingsDialog;$('hub-btn').onclick=hubDialog;$('unload-configuration-btn').onclick=unloadConfiguration;$('help-btn').onclick=help;$('export-current-network-btn').onclick=exportCurrentNetwork;$('export-networks-btn').onclick=exportUpdatedNetworks;$('export-configuration-btn').onclick=exportConfiguration;$('issues-btn').onclick=issuesDialog;$('empty-library-btn').onclick=()=>setTab('library');
-  $('import-btn').onclick=()=>$('file-input').click();$('configuration-import-btn').onclick=()=>$('configuration-input').click();$('file-input').onchange=async e=>{await importFiles([...e.target.files]);e.target.value='';};$('configuration-input').onchange=async e=>{await importFiles([...e.target.files]);e.target.value='';};
+  $('import-btn').onclick=()=>$('file-input').click();$('configuration-import-btn').onclick=()=>$('configuration-input').click();$('connector-import-btn').onclick=loadConnectorConfiguration;$('file-input').onchange=async e=>{await importFiles([...e.target.files]);e.target.value='';};$('configuration-input').onchange=async e=>{await importFiles([...e.target.files]);e.target.value='';};
   $('canvas').addEventListener('wheel',e=>{e.preventDefault();const r=$('canvas').getBoundingClientRect();zoom(Math.exp(-e.deltaY*.0015),{x:e.clientX-r.left,y:e.clientY-r.top});},{passive:false});
   $('canvas').addEventListener('pointerdown',e=>{if(e.button!==0&&e.button!==1)return;selection=null;drag={kind:'pan',startX:e.clientX,startY:e.clientY,x:view.x,y:view.y};$('canvas').setPointerCapture(e.pointerId);renderGraph();renderInspector();});
   $('canvas').addEventListener('pointermove',e=>{

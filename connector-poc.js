@@ -76,7 +76,7 @@
     return '';
   }
 
-  function configurationFromResponse(responseXML) {
+  function configurationDocumentFromResponse(responseXML) {
     const documents = responseDocuments(responseXML);
     const error = queryError(documents);
     if (error) throw new Error(`CMHS/Getquery failed: ${error}`);
@@ -90,12 +90,66 @@
       if (!configuration) throw new Error('CMHS/Getquery returned cmhsConfig, but it is empty.');
       const configDocument = parse(configuration, 'cmhsConfig');
       if (local(configDocument.documentElement) !== 'messagehub') throw new Error('CMHS/Getquery returned cmhsConfig, but it is not a Message Hub configuration (.mhc) document.');
-      return configuration;
+      return configDocument;
     }
     throw new Error('CMHS/Getquery completed, but its response contains no queryResults/record/column named cmhsConfig.');
   }
 
-  async function loadConfiguration() {
+  const directChildren = (element, name) => [...element.children].filter(child => local(child) === name);
+  const cleanName = value => String(value || '').trim().split(/[\\/]/).pop();
+
+  function networkNameFromDocument(network) {
+    const variables = elements(network).find(element => local(element) === 'variables');
+    const variable = variables && directChildren(variables, 'variable').find(item => String(item.getAttribute('name') || '').trim().toUpperCase() === 'NETWORKNAME');
+    return String(variable?.getAttribute('value') || variable?.textContent || '').trim();
+  }
+
+  function networkFilename(value, position, used) {
+    const name = cleanName(value).replace(/\.mhn$/i, '') || `Network_${position + 1}`;
+    const filename = `${name}.mhn`;
+    if (used.has(filename.toLowerCase())) throw new Error(`CMHS/Getquery returned more than one network named “${filename}”. Network filenames must be unique in a configuration.`);
+    used.add(filename.toLowerCase());
+    return filename;
+  }
+
+  // The CMHS query does not return a conventional .mhc alongside separate
+  // .mhn files. It returns one messagehub whose network entries contain the
+  // complete messagehubnetwork XML. Split that transport format locally so
+  // the editor can use its normal configuration model and exports.
+  function workspaceFromResponse(responseXML) {
+    const configurationDocument = configurationDocumentFromResponse(responseXML);
+    const root = configurationDocument.documentElement;
+    const networksElement = directChildren(root, 'networks')[0];
+    if (!networksElement) throw new Error('CMHS/Getquery returned a Message Hub configuration without a networks section.');
+
+    const entries = directChildren(networksElement, 'network');
+    const used = new Set();
+    const networks = [];
+    entries.forEach((entry, index) => {
+      const embedded = directChildren(entry, 'messagehubnetwork')[0];
+      if (!embedded) return;
+      const networkXML = new XMLSerializer().serializeToString(embedded);
+      const filename = networkFilename(entry.getAttribute('filename') || entry.getAttribute('name') || networkNameFromDocument(embedded), index, used);
+      const name = String(entry.getAttribute('name') || networkNameFromDocument(embedded) || filename.replace(/\.mhn$/i, '')).trim();
+      while (entry.firstChild) entry.removeChild(entry.firstChild);
+      entry.setAttribute('filename', filename);
+      if (name) entry.setAttribute('name', name);
+      networks.push({filename, xml: networkXML});
+    });
+
+    if (!networks.length) {
+      // Keep the prior behaviour for installations that still return a normal
+      // .mhc. It can be imported, then its .mhn files can be selected later.
+      return {configuration: {filename: 'CMHS_configuration.mhc', xml: new XMLSerializer().serializeToString(configurationDocument)}, networks: []};
+    }
+    return {configuration: {filename: 'CMHS_configuration.mhc', xml: new XMLSerializer().serializeToString(configurationDocument)}, networks};
+  }
+
+  function configurationFromResponse(responseXML) {
+    return workspaceFromResponse(responseXML).configuration.xml;
+  }
+
+  async function loadWorkspace() {
     let response;
     try {
       response = await fetch(endpoint, {method: 'POST', headers: {'Content-Type': 'application/soap+xml;charset=UTF-8'}, body: soapRequest()});
@@ -104,8 +158,12 @@
     }
     const body = await response.text();
     if (!response.ok) throw new Error(`Connector returned HTTP ${response.status}: ${body.slice(0, 500)}`);
-    return configurationFromResponse(body);
+    return workspaceFromResponse(body);
   }
 
-  global.CMHS_CONNECTOR_POC = {endpoint, queryPayload, soapRequest, configurationFromResponse, loadConfiguration};
+  async function loadConfiguration() {
+    return (await loadWorkspace()).configuration.xml;
+  }
+
+  global.CMHS_CONNECTOR_POC = {endpoint, queryPayload, soapRequest, configurationFromResponse, workspaceFromResponse, loadConfiguration, loadWorkspace};
 })(window);
