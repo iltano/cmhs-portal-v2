@@ -297,7 +297,7 @@
   }
   function hubDialog(){
     const body=el('div'),input=el('textarea','code-editor mono');input.value=hubXML;body.append(el('p','dialog-intro',hubActive?'This open configuration is kept synchronized with its loaded networks. Exporting the configuration includes the .mhc and every registered .mhn file. Unloading it removes only its linked networks from this local workspace.':'Global variables and network registrations from main.mhc. Import a configuration folder to load its linked networks together.'));
-    body.append(input);const actions=[{text:'Load from local connector',run:()=>{$('modal').close();loadConnectorConfiguration();}}];if(hubActive)actions.push({text:'Sort networks A–Z',run:()=>{sortConfigurationNetworks();$('modal').close();}},{text:'Unload configuration',run:()=>unloadConfiguration()});actions.push({text:'Save local draft',run:()=>{if(parseXML(input.value).documentElement.tagName!=='messagehub')throw new Error('The root must be messagehub.');hubXML=input.value;const ok=persistHubState();$('modal').close();toast(ok?'Hub draft saved locally.':'Hub draft kept for this session.',!ok);}},{text:'Export .mhc',primary:true,run:()=>{if(parseXML(input.value).documentElement.tagName!=='messagehub')throw new Error('The root must be messagehub.');hubXML=input.value;download(hubActive?synchronizeHub():hubXML,hubFilename,'application/xml');}});modal('Hub configuration',body,actions);
+    body.append(input);const actions=[{text:'Load from OIR connector',run:()=>{$('modal').close();loadConnectorConfiguration();}}];if(hubActive)actions.push({text:'Sort networks A–Z',run:()=>{sortConfigurationNetworks();$('modal').close();}},{text:'Unload configuration',run:()=>unloadConfiguration()});actions.push({text:'Save local draft',run:()=>{if(parseXML(input.value).documentElement.tagName!=='messagehub')throw new Error('The root must be messagehub.');hubXML=input.value;const ok=persistHubState();$('modal').close();toast(ok?'Hub draft saved locally.':'Hub draft kept for this session.',!ok);}},{text:'Export .mhc',primary:true,run:()=>{if(parseXML(input.value).documentElement.tagName!=='messagehub')throw new Error('The root must be messagehub.');hubXML=input.value;download(hubActive?synchronizeHub():hubXML,hubFilename,'application/xml');}});modal('Hub configuration',body,actions);
   }
   function newNetwork(){let name='NewNetwork';const body=el('div');body.append(field('Network name',name,v=>name=v),el('p','dialog-intro',hubActive?'The new network will be added to the open configuration.':'Start from an empty network, then choose a source from the library.'));modal('New network',body,[{text:'Create network',primary:true,run:()=>{if(!name.trim())throw new Error('Enter a network name.');const next=uniqueNetworkName(name);if(next!==name)throw new Error(`A network named “${name}” already exists.`);const doc=NetworkDocument.empty(name),id='custom:'+Date.now()+'.mhn',network={id,name,filename:name+'.mhn',xml:doc.toXML(),description:'',nodeCount:0,connectionCount:0,imported:true,hubManaged:hubActive,hubKey:null};networks.push(network);if(hubActive)synchronizeHub();$('modal').close();openNetwork(id);saveDraft();setTab('library');}}]);}
   function duplicateNetwork(){
@@ -356,13 +356,13 @@
     importParsedDocuments(parsed);
   }
   async function loadConnectorConfiguration(){
-    if(!window.CMHS_CONNECTOR_POC){toast('The local connector proof of concept is unavailable in this portal build.',true);return;}
-    toast('Reading CMHS configuration through the local connector…');
+    if(!window.CMHS_CONNECTOR_POC){toast('The OIR connector client is unavailable in this portal build.',true);return;}
+    toast('Reading CMHS configuration through the OIR connector…');
     try{
       const xml=await window.CMHS_CONNECTOR_POC.loadConfiguration(),doc=parseXML(xml);
       if(doc.documentElement.tagName!=='messagehub')throw new Error('The returned cmhsConfig XML is not a .mhc Message Hub configuration.');
       importParsedDocuments([{file:{name:'CMHS_configuration.mhc'},xml,doc}]);
-    }catch(error){toast(`Local connector: ${error.message}`,true);}
+    }catch(error){toast(`OIR connector: ${error.message}`,true);}
   }
   function help(){const body=el('div','guide-grid');[
     ['1 · Choose a network','Open any of the bundled networks or import .mhn files. Your original XML stays untouched. Local drafts survive reloads when browser storage is available.'],

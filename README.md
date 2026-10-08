@@ -33,7 +33,7 @@ New, copied, and renamed elements use a component type plus serial convention, f
 
 **Import configuration** opens the `.mhc` and only the `.mhn` files it registers. The `.mhn` filename is the configuration identifier, so one configuration can contain different files with the same `NETWORKNAME` parameter. Filenames must be unique within a configuration.
 
-Use **Hub configuration** to review the configuration XML, sort its networks alphabetically by filename, load an `.mhc` from the local CAIS connector, or unload the configuration from the browser workspace. Drag configuration entries in the left panel to change their registration sequence. When a configuration is open, the same panel includes a **Network library**: drag a network from it onto the configuration to create a named configuration copy. The lower-left **Unload configuration** action removes linked networks from the local workspace.
+Use **Hub configuration** to review the configuration XML, sort its networks alphabetically by filename, load an `.mhc` through the local OIR connector, or unload the configuration from the browser workspace. Drag configuration entries in the left panel to change their registration sequence. When a configuration is open, the same panel includes a **Network library**: drag a network from it onto the configuration to create a named configuration copy. The lower-left **Unload configuration** action removes linked networks from the local workspace.
 
 ## Export choices
 
@@ -57,9 +57,9 @@ Drafts, the open configuration, and workspace templates can be stored in the bro
 
 CMHS Portal is an editor. It does not execute networks, connect to MessageHub, test endpoints, validate credentials, or deploy files.
 
-## Local connector proof of concept
+## OIR configuration connector
 
-When the optional loopback connector is installed and running, open **Hub configuration** and choose **Load from local connector**. The portal sends a read-only `CMHS` command that queries the stored configuration through the existing CAIS endpoint. It reads `queryResults/record/column[@name='cmhsConfig']` from the response and opens the returned `.mhc` locally. The connector remains responsible for CORS and for the fixed local CAIS target; the portal does not store credentials.
+When the optional loopback connector is installed and running, open **Hub configuration** and choose **Load from OIR connector**. The portal sends the read-only `CMHS/Getquery` request exposed in OIR, with the `inputQuery` that reads `runningXMLValue cmhsConfig` from `csmsSetting` under `CMHS\\Network\\`. CAIS returns an escaped XML document inside `SendMessageResult`, with the returned `.mhc` escaped again in `queryResults/record/column[@name='cmhsConfig']`; the portal unwraps both layers and opens the `.mhc` locally. The connector remains responsible for CORS and for the fixed local CAIS target; the portal does not store credentials. The returned configuration registers `.mhn` files but does not include their contents, so import the registered network files as well to edit them.
 
 ## Feedback
 
